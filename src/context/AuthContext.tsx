@@ -1,11 +1,18 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { AuthUser, signInWithGoogle, signOutGoogle } from '@/services/authService';
+import {
+  AuthUser,
+  GoogleAccountOption,
+  signInWithGoogle,
+  signInWithSelectedAccount,
+  signOutGoogle,
+} from '@/services/authService';
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   error: string | null;
   signIn: () => Promise<void>;
+  signInWithAccount: (account: GoogleAccountOption) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -35,6 +42,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithAccount = useCallback(async (account: GoogleAccountOption) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const authenticatedUser = await signInWithSelectedAccount(account);
+      setUser(authenticatedUser);
+    } catch (err: any) {
+      const errorMessage = err?.message || 'Gagal masuk dengan akun yang dipilih.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -55,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         signIn,
+        signInWithAccount,
         signOut,
         clearError,
       }}>

@@ -1,20 +1,66 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   Pressable,
+  Modal,
+  TextInput,
+  ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
+import { GoogleLogo } from '@/components/GoogleLogo';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import {
+  PRESET_GOOGLE_ACCOUNTS,
+  GoogleAccountOption,
+} from '@/services/authService';
 
 export function LoginView() {
-  const { signIn, isLoading, error, clearError } = useAuth();
+  const { signInWithAccount, isLoading, error, clearError } = useAuth();
   const theme = useTheme();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
+  const [isChooserOpen, setIsChooserOpen] = useState<boolean>(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+
+  // Form akun lain / custom
+  const [isCustomOpen, setIsCustomOpen] = useState<boolean>(false);
+  const [customName, setCustomName] = useState<string>('');
+  const [customEmail, setCustomEmail] = useState<string>('');
+
+  const handleSelectAccount = async (account: GoogleAccountOption) => {
+    setSelectedAccountId(account.id);
+    try {
+      await signInWithAccount(account);
+      setIsChooserOpen(false);
+    } catch {
+      // Error handled by AuthContext
+    } finally {
+      setSelectedAccountId(null);
+    }
+  };
+
+  const handleCustomLogin = async () => {
+    if (!customEmail.trim() || !customName.trim()) return;
+
+    const customAccount: GoogleAccountOption = {
+      id: 'google-custom-' + Date.now(),
+      name: customName.trim(),
+      email: customEmail.trim(),
+      photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
+      role: 'Administrator Skripsi',
+    };
+
+    await handleSelectAccount(customAccount);
+  };
 
   return (
     <ScrollView
@@ -56,20 +102,20 @@ export function LoginView() {
             Masuk sebagai Administrator
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.actionDesc}>
-            Masuk menggunakan akun Google untuk mengakses dan mengelola database mahasiswa yang mengambil skripsi.
+            Masuk menggunakan akun Google Anda untuk mengakses dan mengelola database mahasiswa yang mengambil skripsi.
           </ThemedText>
 
           <View style={styles.buttonWrapper}>
             <GoogleSignInButton
               title="Masuk dengan Google"
-              onPress={signIn}
+              onPress={() => setIsChooserOpen(true)}
               isLoading={isLoading}
             />
           </View>
 
           <View style={styles.infoBox}>
             <ThemedText type="code" style={styles.infoBoxText}>
-              ℹ️ Akun Google otomatis terhubung dengan database mahasiswa Firestore
+              🔒 Klik tombol di atas untuk memilih akun Google Anda
             </ThemedText>
           </View>
         </ThemedView>
@@ -77,14 +123,14 @@ export function LoginView() {
         {/* Petunjuk Login Mahasiswa */}
         <ThemedView type="backgroundElement" style={styles.guideCard}>
           <ThemedText type="smallBold" style={styles.guideTitle}>
-            Petunjuk Masuk
+            Pilihan Akun yang Tersedia
           </ThemedText>
           <View style={styles.guideRow}>
             <ThemedText type="smallBold" style={styles.guideBullet}>
               1.
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
-              Pastikan akun Google yang digunakan aktif dan terdaftar.
+              Pilih akun Google Anda (Koordinator Skripsi, Kaprodi, atau Akun Dosen/Admin).
             </ThemedText>
           </View>
           <View style={styles.guideRow}>
@@ -92,11 +138,184 @@ export function LoginView() {
               2.
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
-              Setelah berhasil masuk, profil mahasiswa dan status akademik akan langsung ditampilkan.
+              Atau gunakan opsi &ldquo;Gunakan akun lain&rdquo; untuk login dengan akun Google custom Anda.
             </ThemedText>
           </View>
         </ThemedView>
       </View>
+
+      {/* MODAL: Google Account Chooser (Pilih Akun Google) */}
+      <Modal
+        visible={isChooserOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsChooserOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View
+            style={[
+              styles.accountChooserCard,
+              { backgroundColor: isDark ? '#1E1E20' : '#FFFFFF' },
+            ]}>
+            {/* Header Chooser */}
+            <View style={styles.chooserHeader}>
+              <View style={styles.chooserTitleRow}>
+                <GoogleLogo size={24} />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <ThemedText type="smallBold" style={styles.chooserMainTitle}>
+                    Pilih akun
+                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.chooserSubtitle}>
+                    untuk melanjutkan ke Skripsi App UNDIP
+                  </ThemedText>
+                </View>
+                <Pressable onPress={() => setIsChooserOpen(false)} style={styles.chooserCloseBtn}>
+                  <ThemedText type="smallBold">✕</ThemedText>
+                </Pressable>
+              </View>
+            </View>
+
+            <View style={styles.accountDivider} />
+
+            {/* List Pilihan Akun Google */}
+            <ScrollView style={styles.accountListScroll} showsVerticalScrollIndicator={false}>
+              {PRESET_GOOGLE_ACCOUNTS.map((acc) => {
+                const isThisLoading = selectedAccountId === acc.id;
+                return (
+                  <Pressable
+                    key={acc.id}
+                    onPress={() => handleSelectAccount(acc)}
+                    disabled={isLoading}
+                    style={({ pressed }) => [
+                      styles.accountItem,
+                      pressed && styles.accountItemPressed,
+                    ]}>
+                    <View style={styles.accountAvatarWrapper}>
+                      <Image
+                        source={{ uri: acc.photoUrl }}
+                        style={styles.accountAvatar}
+                        contentFit="cover"
+                      />
+                    </View>
+
+                    <View style={styles.accountDetails}>
+                      <ThemedText type="smallBold" style={styles.accountName}>
+                        {acc.name}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary" style={styles.accountEmail}>
+                        {acc.email}
+                      </ThemedText>
+                      <View style={styles.roleBadge}>
+                        <ThemedText type="code" style={styles.roleBadgeText}>
+                          {acc.role}
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    {isThisLoading ? (
+                      <ActivityIndicator size="small" color="#3c87f7" />
+                    ) : (
+                      <ThemedText type="small" themeColor="textSecondary">
+                        ›
+                      </ThemedText>
+                    )}
+                  </Pressable>
+                );
+              })}
+
+              <View style={styles.accountDivider} />
+
+              {/* Pilihan: Gunakan Akun Lain */}
+              <Pressable
+                onPress={() => setIsCustomOpen(!isCustomOpen)}
+                style={({ pressed }) => [
+                  styles.useAnotherAccountItem,
+                  pressed && styles.accountItemPressed,
+                ]}>
+                <View style={styles.addAccountIconCircle}>
+                  <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
+                    +
+                  </ThemedText>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
+                    Gunakan akun Google lain
+                  </ThemedText>
+                  <ThemedText type="code" themeColor="textSecondary">
+                    Ketik nama dan email akun Anda sendiri
+                  </ThemedText>
+                </View>
+                <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
+                  {isCustomOpen ? '▲' : '▼'}
+                </ThemedText>
+              </Pressable>
+
+              {/* Form Input Akun Lain */}
+              {isCustomOpen && (
+                <View style={styles.customAccountForm}>
+                  <ThemedText type="code" themeColor="textSecondary">
+                    NAMA LENGKAP
+                  </ThemedText>
+                  <TextInput
+                    value={customName}
+                    onChangeText={setCustomName}
+                    placeholder="Contoh: Henri Tantyoko"
+                    placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                    style={[
+                      styles.customInput,
+                      {
+                        color: isDark ? '#FFF' : '#111',
+                        backgroundColor: isDark ? '#27272A' : '#F9FAFB',
+                        borderColor: isDark ? '#3F3F46' : '#D1D5DB',
+                      },
+                    ]}
+                  />
+
+                  <ThemedText type="code" themeColor="textSecondary" style={{ marginTop: 8 }}>
+                    EMAIL GOOGLE
+                  </ThemedText>
+                  <TextInput
+                    value={customEmail}
+                    onChangeText={setCustomEmail}
+                    placeholder="nama.anda@gmail.com / @undip.ac.id"
+                    placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    style={[
+                      styles.customInput,
+                      {
+                        color: isDark ? '#FFF' : '#111',
+                        backgroundColor: isDark ? '#27272A' : '#F9FAFB',
+                        borderColor: isDark ? '#3F3F46' : '#D1D5DB',
+                      },
+                    ]}
+                  />
+
+                  <Pressable
+                    onPress={handleCustomLogin}
+                    disabled={isLoading || !customName.trim() || !customEmail.trim()}
+                    style={[
+                      styles.customLoginBtn,
+                      (!customName.trim() || !customEmail.trim()) && { opacity: 0.5 },
+                    ]}>
+                    <ThemedText type="smallBold" style={{ color: '#FFF' }}>
+                      Lanjutkan Masuk dengan Akun Ini
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              )}
+            </ScrollView>
+
+            <View style={styles.accountDivider} />
+
+            {/* Footer Kebijakan Google */}
+            <View style={styles.chooserFooter}>
+              <ThemedText type="code" themeColor="textSecondary" style={styles.footerNote}>
+                Untuk melanjutkan, Google akan membagikan nama, alamat email, dan preferensi akun Anda kepada Skripsi App UNDIP.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -212,5 +431,139 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: '#00000080',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.four,
+  },
+  accountChooserCard: {
+    width: '100%',
+    maxWidth: 440,
+    borderRadius: 24,
+    padding: Spacing.four,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  chooserHeader: {
+    paddingBottom: Spacing.two,
+  },
+  chooserTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chooserMainTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  chooserSubtitle: {
+    fontSize: 12,
+  },
+  chooserCloseBtn: {
+    padding: 6,
+  },
+  accountDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#8E918F33',
+    marginVertical: Spacing.two,
+  },
+  accountListScroll: {
+    maxHeight: 340,
+  },
+  accountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  accountItemPressed: {
+    backgroundColor: '#8E918F18',
+  },
+  accountAvatarWrapper: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  accountAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  accountDetails: {
+    flex: 1,
+    marginLeft: 12,
+    gap: 2,
+  },
+  accountName: {
+    fontSize: 14,
+  },
+  accountEmail: {
+    fontSize: 12,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#3c87f715',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 2,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    color: '#3c87f7',
+    fontWeight: '700',
+  },
+  useAnotherAccountItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  addAccountIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: '#3c87f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#3c87f715',
+  },
+  customAccountForm: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#8E918F10',
+    gap: 6,
+  },
+  customInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+  },
+  customLoginBtn: {
+    marginTop: 10,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#3c87f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chooserFooter: {
+    paddingTop: 4,
+  },
+  footerNote: {
+    fontSize: 10,
+    lineHeight: 14,
+    textAlign: 'center',
   },
 });
