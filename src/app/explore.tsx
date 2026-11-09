@@ -47,8 +47,28 @@ export default function RekapitulasiScreen() {
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let isMounted = true;
+
+    fetchAllMahasiswa()
+      .then((data) => {
+        if (isMounted) {
+          setMahasiswaList(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Gagal memuat data rekapitulasi:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);

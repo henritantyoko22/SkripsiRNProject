@@ -55,8 +55,35 @@ export function MahasiswaHomeView() {
   }, [user]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    let isMounted = true;
+
+    if (!user?.email) return;
+
+    fetchMahasiswaData(user.email, user.name || undefined, user.photoUrl)
+      .then((data) => {
+        if (isMounted) {
+          setStudentData(data);
+          setEditNim(data.nim);
+          setEditNama(data.nama);
+          setEditJurusan(data.jurusan);
+          setEditFakultas(data.fakultas);
+          setEditJudul(data.judulSkripsi);
+        }
+      })
+      .catch((err) => {
+        console.warn('Gagal memuat data mahasiswa:', err);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingData(false);
+          setRefreshing(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   const handleRefresh = () => {
     setRefreshing(true);

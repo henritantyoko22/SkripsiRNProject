@@ -118,9 +118,31 @@ export function HomeView() {
   }, []);
 
   useEffect(() => {
-    loadData();
-    loadUsers();
-  }, [loadData, loadUsers]);
+    let isMounted = true;
+
+    const fetchData = async () => {
+      try {
+        const [mhs, users] = await Promise.all([fetchAllMahasiswa(), fetchAllUsers()]);
+        if (isMounted) {
+          setMahasiswaList(mhs);
+          setUsersList(users);
+        }
+      } catch (err) {
+        console.warn('Gagal memuat data awal:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+          setLoadingUsers(false);
+        }
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
