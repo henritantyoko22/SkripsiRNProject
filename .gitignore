@@ -38,6 +38,11 @@ yarn-error.*
 
 example
 
+# Firebase / Google Services credentials
+GoogleService-Info.plist
+*GoogleService-Info.plist
+google-services.json
+
 # generated native folders
 /ios
 /android
