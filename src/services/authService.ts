@@ -1,7 +1,11 @@
 import * as WebBrowser from 'expo-web-browser';
 import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
 import { fetchMahasiswaData } from '@/services/studentService';
-import { fetchUserFromFirestore, saveUserToFirestore } from '@/services/userService';
+import {
+  fetchUserFromFirestore,
+  saveUserToFirestore,
+  findUserInFirestore,
+} from '@/services/userService';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -182,64 +186,101 @@ function extractQueryParam(url: string, param: string): string | null {
 /**
  * 1. Otentikasi Email & Password (Login)
  */
-export async function signInWithEmailPassword(emailInput: string, passwordInput: string): Promise<AuthUser> {
-  const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
+/**
+ * 1. Otentikasi Email & Password (Login)
+ * Memverifikasi username/email dan KATA SANDI (PASSWORD) langsung dari table 'users' di Cloud Firestore!
+ */
+export async function signInWithEmailPassword(identifierInput: string, passwordInput: string): Promise<AuthUser> {
+  const cleanInput = identifierInput.trim();
+  const password = passwordInput.trim();
 
-  let localId = 'usr-' + Date.now();
-  let displayName = email.split('@')[0];
-  let idToken = 'token-' + Date.now();
-
-  try {
-    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password: passwordInput,
-        returnSecureToken: true,
-      }),
-    });
-
-    const data = await response.json();
-    if (response.ok && data.localId) {
-      localId = data.localId;
-      displayName = data.displayName || displayName;
-      idToken = data.idToken || idToken;
-    } else {
-      const code = data?.error?.message || '';
-      if (code.includes('INVALID_PASSWORD') || code.includes('INVALID_LOGIN_CREDENTIALS')) {
-        throw new Error('Kata sandi salah. Silakan periksa kembali.');
-      }
-      if (code.includes('EMAIL_NOT_FOUND')) {
-        throw new Error('Email belum terdaftar. Silakan daftar akun baru di tab Daftar.');
-      }
-      // Jika OPERATION_NOT_ALLOWED, diproses via Firestore
-      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED, login diproses via Firestore.');
-    }
-  } catch (err: any) {
-    if (err?.message?.includes('Kata sandi salah') || err?.message?.includes('belum terdaftar')) {
-      throw err;
-    }
+  if (!cleanInput || !password) {
+    throw new Error('Silakan isi email/username dan kata sandi Anda.');
   }
 
-  // Ambil role dari koleksi 'users' di Cloud Firestore (User Management)
-  const userAccount = await fetchUserFromFirestore(email, displayName);
+  // 1. Cari data akun di koleksi 'users' Cloud Firestore
+  let userAccount = await findUserInFirestore(cleanInput);
+
+  // Jika tidak ditemukan di 'users', coba cek apakah ada di koleksi 'mahasiswa'
+  if (!userAccount) {
+    const candidateEmail = cleanInput.includes('@') ? cleanInput : `${cleanInput}@undip.ac.id`;
+    try {
+      const student = await fetchMahasiswaData(candidateEmail);
+      if (student && student.nama) {
+        userAccount = {
+          uid: 'usr_' + Date.now(),
+          nama: student.nama,
+          email: student.email,
+          nim: student.nim,
+          role: 'user',
+          status: 'Aktif',
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+        };
+        await saveUserToFirestore(userAccount);
+      }
+    } catch {}
+  }
+
+  if (!userAccount) {
+    throw new Error('Email atau username tidak terdaftar. Silakan periksa kembali atau lakukan pendaftaran di tab Daftar.');
+  }
+
+  // 2. PENGECEKAN KATA SANDI (PASSWORD) SESUAI DATA DI TABLE USER FIRESTORE
+  if (userAccount.password) {
+    if (userAccount.password !== password) {
+      throw new Error('Kata sandi salah. Silakan periksa kembali kata sandi Anda.');
+    }
+  } else {
+    // Jika belum tersimpan field password di user doc Firestore, cocokkan via Firebase Auth REST API
+    try {
+      const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: userAccount.email,
+          password: password,
+          returnSecureToken: true,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const code = data?.error?.message || '';
+        if (code.includes('INVALID_PASSWORD') || code.includes('INVALID_LOGIN_CREDENTIALS')) {
+          throw new Error('Kata sandi salah. Silakan periksa kembali kata sandi Anda.');
+        }
+      }
+    } catch (err: any) {
+      if (err?.message?.includes('Kata sandi salah')) {
+        throw err;
+      }
+    }
+
+    // Simpan password ke Firestore agar terverifikasi secara konsisten seterusnya
+    userAccount.password = password;
+  }
+
+  // Update lastLogin dan simpan ke Firestore
+  userAccount.lastLogin = new Date().toISOString();
+  saveUserToFirestore(userAccount).catch(() => {});
+
   const role: UserRole = userAccount.role;
+  let displayName = userAccount.nama || userAccount.email.split('@')[0];
 
   // Jika user biasa, sinkronkan profilnya di koleksi mahasiswa Firestore
   if (role === 'user') {
-    const student = await fetchMahasiswaData(email, displayName);
+    const student = await fetchMahasiswaData(userAccount.email, displayName);
     displayName = student.nama || displayName;
   }
 
   return {
-    id: localId,
+    id: userAccount.uid || 'usr-' + Date.now(),
     name: displayName,
-    email: email,
+    email: userAccount.email,
     photoUrl: null,
     role: role,
-    idToken: idToken,
+    idToken: 'token-' + Date.now(),
     provider: 'password',
     projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
     bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
@@ -251,7 +292,7 @@ export async function signInWithEmailPassword(emailInput: string, passwordInput:
 /**
  * 2. Registrasi Akun Baru (Register):
  * Otomatis memasukkan pengguna ke koleksi 'users' (User Management) dengan role: 'user'
- * dan membuat dokumen di koleksi 'mahasiswa' Firestore.
+ * LENGKAP dengan field password, dan membuat dokumen di koleksi 'mahasiswa' Firestore.
  */
 export async function signUpWithEmailPassword(
   nameInput: string,
@@ -308,11 +349,12 @@ export async function signUpWithEmailPassword(
     }
   }
 
-  // 1. Simpan ke koleksi 'users' di Cloud Firestore (User Management)
+  // 1. Simpan ke koleksi 'users' di Cloud Firestore (User Management) LENGKAP DENGAN PASSWORD!
   await saveUserToFirestore({
     uid: localId,
     nama: nameInput.trim(),
     email: email,
+    password: passwordInput.trim(),
     role: 'user',
     status: 'Aktif',
     createdAt: new Date().toISOString(),

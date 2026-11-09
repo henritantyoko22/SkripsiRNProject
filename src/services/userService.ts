@@ -5,6 +5,7 @@ export interface UserAccount {
   uid: string;
   nama: string;
   email: string;
+  password?: string;
   role: 'admin' | 'user';
   nim?: string;
   status: 'Aktif' | 'Nonaktif';
@@ -31,18 +32,22 @@ function getSafeHeaders(): Record<string, string> {
 }
 
 function toFirestoreUserFields(user: UserAccount) {
-  return {
-    fields: {
-      uid: { stringValue: user.uid },
-      nama: { stringValue: user.nama },
-      email: { stringValue: user.email },
-      role: { stringValue: user.role },
-      nim: { stringValue: user.nim || '' },
-      status: { stringValue: user.status || 'Aktif' },
-      createdAt: { stringValue: user.createdAt || new Date().toISOString() },
-      lastLogin: { stringValue: user.lastLogin || new Date().toISOString() },
-    },
+  const fields: Record<string, any> = {
+    uid: { stringValue: user.uid },
+    nama: { stringValue: user.nama },
+    email: { stringValue: user.email },
+    role: { stringValue: user.role },
+    nim: { stringValue: user.nim || '' },
+    status: { stringValue: user.status || 'Aktif' },
+    createdAt: { stringValue: user.createdAt || new Date().toISOString() },
+    lastLogin: { stringValue: user.lastLogin || new Date().toISOString() },
   };
+
+  if (user.password) {
+    fields.password = { stringValue: user.password };
+  }
+
+  return { fields };
 }
 
 function fromFirestoreUserDoc(doc: any): UserAccount | null {
@@ -52,6 +57,7 @@ function fromFirestoreUserDoc(doc: any): UserAccount | null {
     uid: f.uid?.stringValue || doc.name?.split('/').pop() || 'usr_' + Date.now(),
     nama: f.nama?.stringValue || 'Pengguna',
     email: f.email?.stringValue || '',
+    password: f.password?.stringValue,
     role: (f.role?.stringValue === 'admin' ? 'admin' : 'user') as 'admin' | 'user',
     nim: f.nim?.stringValue || undefined,
     status: (f.status?.stringValue === 'Nonaktif' ? 'Nonaktif' : 'Aktif') as 'Aktif' | 'Nonaktif',
@@ -82,29 +88,73 @@ export async function saveUserToFirestore(user: UserAccount): Promise<boolean> {
 }
 
 /**
+ * Mengambil SELURUH pengguna dari koleksi 'users' Cloud Firestore untuk User Management
+ */
+export async function fetchAllUsers(): Promise<UserAccount[]> {
+  const url = `${FIRESTORE_USERS_URL}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+
+  try {
+    const response = await fetch(url, { headers: getSafeHeaders() });
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.documents && Array.isArray(data.documents)) {
+        return data.documents
+          .map(fromFirestoreUserDoc)
+          .filter((u: UserAccount | null): u is UserAccount => u !== null && Boolean(u.email));
+      }
+    }
+  } catch (err) {
+    console.warn('[Firestore users] Gagal fetch all users:', err);
+  }
+
+  return [];
+}
+
+/**
+ * Mencari akun pengguna di Firestore berdasarkan email atau username
+ */
+export async function findUserInFirestore(identifier: string): Promise<UserAccount | null> {
+  const clean = identifier.trim().toLowerCase();
+
+  // 1. Coba ambil langsung berdasarkan doc ID (jika berupa email)
+  const candidateEmail = clean.includes('@') ? clean : `${clean}@undip.ac.id`;
+  const docId = getUserDocId(candidateEmail);
+  const url = `${FIRESTORE_USERS_URL}/${docId}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+
+  try {
+    const res = await fetch(url, { headers: getSafeHeaders() });
+    if (res.ok) {
+      const data = await res.json();
+      const user = fromFirestoreUserDoc(data);
+      if (user) return user;
+    }
+  } catch {}
+
+  // 2. Jika tidak ditemukan lewat docId langsung, cari di seluruh koleksi 'users'
+  const allUsers = await fetchAllUsers();
+  const matched = allUsers.find((u) => {
+    const uEmail = u.email.toLowerCase();
+    const uName = (u.nama || '').toLowerCase();
+    const uPrefix = uEmail.split('@')[0];
+    return uEmail === clean || uPrefix === clean || uName === clean;
+  });
+
+  return matched || null;
+}
+
+/**
  * Mengambil data user dari koleksi 'users' Cloud Firestore berdasarkan email.
  * Jika belum ada di Firestore, otomatis diinisialisasi berdasarkan email:
  * - Email admin (henritantyoko@..., admin@..., dosen...) -> role 'admin'
  * - Email mahasiswa lainnya -> role 'user'
  */
 export async function fetchUserFromFirestore(email: string, fallbackName?: string): Promise<UserAccount> {
-  const docId = getUserDocId(email);
-  const url = `${FIRESTORE_USERS_URL}/${docId}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
-
-  try {
-    const response = await fetch(url, { headers: getSafeHeaders() });
-    if (response.ok) {
-      const data = await response.json();
-      const existingUser = fromFirestoreUserDoc(data);
-      if (existingUser) {
-        // Update last login
-        existingUser.lastLogin = new Date().toISOString();
-        saveUserToFirestore(existingUser).catch(() => {});
-        return existingUser;
-      }
-    }
-  } catch (err) {
-    console.warn('[Firestore users] Gagal fetch user:', err);
+  // Cek apakah sudah ada di Firestore
+  const existingUser = await findUserInFirestore(email);
+  if (existingUser) {
+    existingUser.lastLogin = new Date().toISOString();
+    saveUserToFirestore(existingUser).catch(() => {});
+    return existingUser;
   }
 
   // Tentukan default role jika belum terdaftar
@@ -128,29 +178,6 @@ export async function fetchUserFromFirestore(email: string, fallbackName?: strin
   // Simpan ke Firestore koleksi 'users'
   saveUserToFirestore(newUser).catch(() => {});
   return newUser;
-}
-
-/**
- * Mengambil SELURUH pengguna dari koleksi 'users' Cloud Firestore untuk User Management
- */
-export async function fetchAllUsers(): Promise<UserAccount[]> {
-  const url = `${FIRESTORE_USERS_URL}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
-
-  try {
-    const response = await fetch(url, { headers: getSafeHeaders() });
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.documents && Array.isArray(data.documents)) {
-        return data.documents
-          .map(fromFirestoreUserDoc)
-          .filter((u: UserAccount | null): u is UserAccount => u !== null && Boolean(u.email));
-      }
-    }
-  } catch (err) {
-    console.warn('[Firestore users] Gagal fetch all users:', err);
-  }
-
-  return [];
 }
 
 /**
