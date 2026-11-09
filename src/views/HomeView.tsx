@@ -17,46 +17,53 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
 import {
   MahasiswaData,
-  fetchMahasiswaData,
+  fetchAllMahasiswa,
   saveMahasiswaData,
+  deleteMahasiswaData,
 } from '@/services/studentService';
 
 export function HomeView() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
-  const [studentData, setStudentData] = useState<MahasiswaData | null>(null);
-  const [loadingData, setLoadingData] = useState<boolean>(true);
+  const [mahasiswaList, setMahasiswaList] = useState<MahasiswaData[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('Semua');
+
+  // Modal Detail state
+  const [selectedMhs, setSelectedMhs] = useState<MahasiswaData | null>(null);
+
+  // Modal Form (Tambah / Edit) state
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
 
-  // Edit form state
-  const [editNim, setEditNim] = useState('');
-  const [editNama, setEditNama] = useState('');
-  const [editJurusan, setEditJurusan] = useState('');
-  const [editFakultas, setEditFakultas] = useState('');
-  const [editSemester, setEditSemester] = useState('7');
-  const [editIpk, setEditIpk] = useState('3.84');
-  const [editJudul, setEditJudul] = useState('');
+  // Form input fields
+  const [formNim, setFormNim] = useState('');
+  const [formNama, setFormNama] = useState('');
+  const [formEmail, setFormEmail] = useState('');
+  const [formJurusan, setFormJurusan] = useState('Informatika');
+  const [formFakultas, setFormFakultas] = useState('Sains dan Matematika');
+  const [formAngkatan, setFormAngkatan] = useState('2021');
+  const [formSemester, setFormSemester] = useState('7');
+  const [formIpk, setFormIpk] = useState('3.80');
+  const [formSks, setFormSks] = useState('138');
+  const [formJudul, setFormJudul] = useState('');
+  const [formPembimbing, setFormPembimbing] = useState('Dr. Aris Sugiharto, S.Si., M.Kom.');
+  const [formDosenWali, setFormDosenWali] = useState('Prof. Dr. Kusworo Adi, S.Si., M.T.');
+  const [formStatusSkripsi, setFormStatusSkripsi] = useState<'Bimbingan' | 'Seminar Proposal' | 'Sidang Skripsi' | 'Lulus'>('Bimbingan');
 
   const loadData = useCallback(async () => {
-    if (!user?.email) return;
     try {
-      const data = await fetchMahasiswaData(user.email, user.name, user.photoUrl);
-      setStudentData(data);
-      setEditNim(data.nim);
-      setEditNama(data.nama);
-      setEditJurusan(data.jurusan);
-      setEditFakultas(data.fakultas);
-      setEditSemester(data.semester.toString());
-      setEditIpk(data.ipk.toString());
-      setEditJudul(data.judulSkripsi);
+      const data = await fetchAllMahasiswa();
+      setMahasiswaList(data);
     } catch (err) {
-      console.warn('Gagal memuat data mahasiswa:', err);
+      console.warn('Gagal memuat list mahasiswa:', err);
     } finally {
-      setLoadingData(false);
+      setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -67,36 +74,107 @@ export function HomeView() {
     loadData();
   };
 
-  const handleSaveEdit = async () => {
-    if (!studentData) return;
-    try {
-      setSaving(true);
-      const updated: MahasiswaData = {
-        ...studentData,
-        nim: editNim.trim() || studentData.nim,
-        nama: editNama.trim() || studentData.nama,
-        jurusan: editJurusan.trim() || studentData.jurusan,
-        fakultas: editFakultas.trim() || studentData.fakultas,
-        semester: Number(editSemester) || studentData.semester,
-        ipk: parseFloat(editIpk) || studentData.ipk,
-        judulSkripsi: editJudul.trim() || studentData.judulSkripsi,
-      };
+  const handleOpenAdd = () => {
+    setIsEditing(false);
+    setFormNim('240601211' + Math.floor(10000 + Math.random() * 90000));
+    setFormNama('');
+    setFormEmail('');
+    setFormJurusan('Informatika');
+    setFormFakultas('Sains dan Matematika');
+    setFormAngkatan('2021');
+    setFormSemester('7');
+    setFormIpk('3.80');
+    setFormSks('138');
+    setFormJudul('');
+    setFormPembimbing('Dr. Aris Sugiharto, S.Si., M.Kom.');
+    setFormDosenWali('Prof. Dr. Kusworo Adi, S.Si., M.T.');
+    setFormStatusSkripsi('Bimbingan');
+    setIsFormOpen(true);
+  };
 
-      const success = await saveMahasiswaData(updated);
-      setStudentData(updated);
-      setIsEditing(false);
-      Alert.alert('Sukses', success ? 'Data mahasiswa berhasil diperbarui di database Firestore.' : 'Data tersimpan di sesi lokal.');
-    } catch (e) {
-      Alert.alert('Error', 'Gagal menyimpan perubahan data.');
+  const handleOpenEdit = (mhs: MahasiswaData) => {
+    setIsEditing(true);
+    setFormNim(mhs.nim);
+    setFormNama(mhs.nama);
+    setFormEmail(mhs.email);
+    setFormJurusan(mhs.jurusan);
+    setFormFakultas(mhs.fakultas);
+    setFormAngkatan(mhs.angkatan);
+    setFormSemester(mhs.semester.toString());
+    setFormIpk(mhs.ipk.toString());
+    setFormSks(mhs.sksSelesai.toString());
+    setFormJudul(mhs.judulSkripsi);
+    setFormPembimbing(mhs.pembimbingSkripsi);
+    setFormDosenWali(mhs.dosenWali);
+    setFormStatusSkripsi(mhs.statusSkripsi || 'Bimbingan');
+    setIsFormOpen(true);
+  };
+
+  const handleSaveForm = async () => {
+    if (!formNama.trim() || !formNim.trim() || !formJudul.trim()) {
+      Alert.alert('Perhatian', 'Harap isi NIM, Nama Mahasiswa, dan Judul Skripsi.');
+      return;
+    }
+
+    const email = formEmail.trim() || `${formNim.toLowerCase()}@students.undip.ac.id`;
+
+    const payload: MahasiswaData = {
+      nim: formNim.trim(),
+      nama: formNama.trim(),
+      email: email,
+      fotoUrl: `https://images.unsplash.com/photo-${1535713875002 + Math.floor(Math.random() * 1000)}?auto=format&fit=crop&w=200&q=80`,
+      fakultas: formFakultas.trim(),
+      jurusan: formJurusan.trim(),
+      angkatan: formAngkatan.trim(),
+      semester: Number(formSemester) || 7,
+      statusAkademik: 'Aktif',
+      statusSkripsi: formStatusSkripsi,
+      ipk: parseFloat(formIpk) || 3.8,
+      sksSelesai: Number(formSks) || 138,
+      dosenWali: formDosenWali.trim(),
+      judulSkripsi: formJudul.trim(),
+      pembimbingSkripsi: formPembimbing.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    setSaving(true);
+    try {
+      await saveMahasiswaData(payload);
+      await loadData();
+      setIsFormOpen(false);
+      Alert.alert('Sukses', `Data mahasiswa "${payload.nama}" berhasil disimpan ke Firestore.`);
+    } catch (err) {
+      Alert.alert('Error', 'Gagal menyimpan ke database Firestore.');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = (mhs: MahasiswaData) => {
+    Alert.alert(
+      'Hapus Mahasiswa',
+      `Yakin ingin menghapus data skripsi "${mhs.nama}" (${mhs.nim}) dari Firestore?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteMahasiswaData(mhs.email);
+            await loadData();
+            if (selectedMhs?.email === mhs.email) {
+              setSelectedMhs(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSignOut = () => {
     Alert.alert(
       'Konfirmasi Keluar',
-      'Apakah Anda yakin ingin keluar dari akun mahasiswa ini?',
+      'Keluar dari sesi Administrator Skripsi?',
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -108,18 +186,38 @@ export function HomeView() {
     );
   };
 
-  if (loadingData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#3c87f7" />
-        <ThemedText type="small" themeColor="textSecondary" style={styles.loadingText}>
-          Memuat data mahasiswa dari database...
-        </ThemedText>
-      </View>
-    );
-  }
+  // Filter list
+  const filteredList = mahasiswaList.filter((mhs) => {
+    const matchesSearch =
+      mhs.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      mhs.nim.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      mhs.judulSkripsi.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      mhs.pembimbingSkripsi.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const data = studentData!;
+    const matchesStatus =
+      selectedStatusFilter === 'Semua' || mhs.statusSkripsi === selectedStatusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  // Statistik singkat
+  const totalMahasiswa = mahasiswaList.length;
+  const countBimbingan = mahasiswaList.filter((m) => m.statusSkripsi === 'Bimbingan').length;
+  const countSempro = mahasiswaList.filter((m) => m.statusSkripsi === 'Seminar Proposal').length;
+  const countSidang = mahasiswaList.filter((m) => m.statusSkripsi === 'Sidang Skripsi').length;
+
+  const getStatusBadgeStyle = (status?: string) => {
+    switch (status) {
+      case 'Seminar Proposal':
+        return { bg: '#FEF3C7', text: '#92400E', border: '#FDE68A' };
+      case 'Sidang Skripsi':
+        return { bg: '#EDE9FE', text: '#5B21B6', border: '#DDD6FE' };
+      case 'Lulus':
+        return { bg: '#D1FAE5', text: '#065F46', border: '#A7F3D0' };
+      default:
+        return { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' };
+    }
+  };
 
   return (
     <ScrollView
@@ -129,302 +227,540 @@ export function HomeView() {
         <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
       }>
       <View style={styles.container}>
-        {/* Top Header Bar */}
-        <View style={styles.headerBar}>
+        {/* Admin Header Bar */}
+        <ThemedView type="backgroundElement" style={styles.adminHeaderCard}>
+          <View style={styles.adminProfileRow}>
+            {user?.photoUrl ? (
+              <Image
+                source={{ uri: user.photoUrl }}
+                style={styles.adminAvatar}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={styles.adminAvatarFallback}>
+                <ThemedText type="smallBold" style={{ color: '#fff' }}>
+                  ADM
+                </ThemedText>
+              </View>
+            )}
+            <View style={styles.adminInfo}>
+              <View style={styles.adminBadge}>
+                <ThemedText type="code" style={styles.adminBadgeText}>
+                  ADMINISTRATOR SKRIPSI
+                </ThemedText>
+              </View>
+              <ThemedText type="smallBold" style={styles.adminName}>
+                {user?.name || 'Administrator'}
+              </ThemedText>
+              <ThemedText type="code" themeColor="textSecondary" style={styles.adminEmail}>
+                {user?.email || 'admin@undip.ac.id'}
+              </ThemedText>
+            </View>
+
+            <Pressable
+              onPress={handleSignOut}
+              disabled={isAuthLoading}
+              style={styles.adminSignOutBtn}>
+              <ThemedText type="code" style={styles.adminSignOutText}>
+                Keluar
+              </ThemedText>
+            </Pressable>
+          </View>
+        </ThemedView>
+
+        {/* Title & Quick Stats */}
+        <View style={styles.statsHeaderRow}>
           <View>
-            <ThemedText type="code" themeColor="textSecondary">
-              PORTAL AKADEMIK
+            <ThemedText type="subtitle" style={styles.pageTitle}>
+              Daftar Mahasiswa &amp; Skripsi
             </ThemedText>
-            <ThemedText type="subtitle" style={styles.headerTitle}>
-              Home Mahasiswa
+            <ThemedText type="small" themeColor="textSecondary">
+              Database Cloud Firestore • Universitas Diponegoro
             </ThemedText>
           </View>
-          <Pressable onPress={() => setIsEditing(true)} style={styles.editButton}>
-            <ThemedText type="smallBold" style={styles.editText}>
-              ✏️ Edit Data
+
+          <Pressable onPress={handleOpenAdd} style={styles.addButton}>
+            <ThemedText type="smallBold" style={styles.addButtonText}>
+              + Tambah Mahasiswa
             </ThemedText>
           </Pressable>
         </View>
 
-        {/* Kartu Tanda Mahasiswa Digital (KTM) */}
-        <View style={styles.ktmCard}>
-          <View style={styles.ktmTopBar}>
-            <View>
-              <ThemedText type="code" style={styles.ktmUni}>
-                UNIVERSITAS DIPONEGORO
-              </ThemedText>
-              <ThemedText type="smallBold" style={styles.ktmCardTitle}>
-                KARTU TANDA MAHASISWA
-              </ThemedText>
-            </View>
-            <View style={styles.activeBadge}>
-              <View style={styles.activeDot} />
-              <ThemedText type="code" style={styles.activeBadgeText}>
-                {data.statusAkademik.toUpperCase()}
-              </ThemedText>
-            </View>
-          </View>
+        {/* Metric Cards Row */}
+        <View style={styles.metricsRow}>
+          <ThemedView type="backgroundElement" style={styles.metricCard}>
+            <ThemedText type="code" themeColor="textSecondary">
+              TOTAL
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.metricNum}>
+              {totalMahasiswa}
+            </ThemedText>
+            <ThemedText type="code" style={styles.metricSub}>
+              Mahasiswa
+            </ThemedText>
+          </ThemedView>
 
-          <View style={styles.ktmBody}>
-            <View style={styles.ktmPhotoWrapper}>
-              {data.fotoUrl ? (
-                <Image
-                  source={{ uri: data.fotoUrl }}
-                  style={styles.ktmPhoto}
-                  contentFit="cover"
-                />
-              ) : (
-                <View style={styles.ktmPhotoFallback}>
-                  <ThemedText type="subtitle" style={styles.photoInitial}>
-                    {data.nama.charAt(0)}
+          <ThemedView type="backgroundElement" style={styles.metricCard}>
+            <ThemedText type="code" style={{ color: '#1E40AF' }}>
+              BIMBINGAN
+            </ThemedText>
+            <ThemedText type="subtitle" style={[styles.metricNum, { color: '#1E40AF' }]}>
+              {countBimbingan}
+            </ThemedText>
+            <ThemedText type="code" style={styles.metricSub}>
+              Aktif
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={styles.metricCard}>
+            <ThemedText type="code" style={{ color: '#92400E' }}>
+              SEMPRO
+            </ThemedText>
+            <ThemedText type="subtitle" style={[styles.metricNum, { color: '#92400E' }]}>
+              {countSempro}
+            </ThemedText>
+            <ThemedText type="code" style={styles.metricSub}>
+              Proposal
+            </ThemedText>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={styles.metricCard}>
+            <ThemedText type="code" style={{ color: '#5B21B6' }}>
+              SIDANG
+            </ThemedText>
+            <ThemedText type="subtitle" style={[styles.metricNum, { color: '#5B21B6' }]}>
+              {countSidang}
+            </ThemedText>
+            <ThemedText type="code" style={styles.metricSub}>
+              Ujian Akhir
+            </ThemedText>
+          </ThemedView>
+        </View>
+
+        {/* Search & Filter Bar */}
+        <ThemedView type="backgroundElement" style={styles.filterSection}>
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="🔍 Cari Mahasiswa, NIM, Judul Skripsi, atau Dosen..."
+            placeholderTextColor="#888"
+            style={styles.searchInput}
+          />
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsRow}>
+            {['Semua', 'Bimbingan', 'Seminar Proposal', 'Sidang Skripsi', 'Lulus'].map((filter) => {
+              const active = selectedStatusFilter === filter;
+              return (
+                <Pressable
+                  key={filter}
+                  onPress={() => setSelectedStatusFilter(filter)}
+                  style={[styles.filterChip, active && styles.filterChipActive]}>
+                  <ThemedText
+                    type="code"
+                    style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                    {filter}
                   </ThemedText>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.ktmInfo}>
-              <ThemedText type="smallBold" style={styles.ktmNama} numberOfLines={2}>
-                {data.nama}
-              </ThemedText>
-              <ThemedText type="code" style={styles.ktmNim}>
-                NIM: {data.nim}
-              </ThemedText>
-              <ThemedText type="small" style={styles.ktmProdi}>
-                {data.jurusan}
-              </ThemedText>
-              <ThemedText type="small" style={styles.ktmFakultas}>
-                Fak. {data.fakultas}
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.ktmFooter}>
-            <ThemedText type="code" style={styles.ktmEmail}>
-              {data.email}
-            </ThemedText>
-            <ThemedText type="code" style={styles.ktmAngkatan}>
-              Angkatan {data.angkatan}
-            </ThemedText>
-          </View>
-        </View>
-
-        {/* Ringkasan Statistik Akademik */}
-        <View style={styles.statsRow}>
-          <ThemedView type="backgroundElement" style={styles.statBox}>
-            <ThemedText type="code" themeColor="textSecondary">
-              IPK
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.statValueHighlight}>
-              {data.ipk.toFixed(2)}
-            </ThemedText>
-            <ThemedText type="code" style={styles.statSub}>
-              Skala 4.00
-            </ThemedText>
-          </ThemedView>
-
-          <ThemedView type="backgroundElement" style={styles.statBox}>
-            <ThemedText type="code" themeColor="textSecondary">
-              SKS SELESAI
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.statValue}>
-              {data.sksSelesai}
-            </ThemedText>
-            <ThemedText type="code" style={styles.statSub}>
-              Total 144 SKS
-            </ThemedText>
-          </ThemedView>
-
-          <ThemedView type="backgroundElement" style={styles.statBox}>
-            <ThemedText type="code" themeColor="textSecondary">
-              SEMESTER
-            </ThemedText>
-            <ThemedText type="subtitle" style={styles.statValue}>
-              {data.semester}
-            </ThemedText>
-            <ThemedText type="code" style={styles.statSub}>
-              Ganjil 2026/2027
-            </ThemedText>
-          </ThemedView>
-        </View>
-
-        {/* Informasi Skripsi & Dosen Pembimbing */}
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <View style={styles.cardTitleRow}>
-            <ThemedText type="smallBold" style={styles.cardTitle}>
-              Informasi Tugas Akhir / Skripsi
-            </ThemedText>
-            <View style={styles.skripsiBadge}>
-              <ThemedText type="code" style={styles.skripsiBadgeText}>
-                TAHAP PENGERJAAN
-              </ThemedText>
-            </View>
-          </View>
-
-          <View style={styles.skripsiContent}>
-            <ThemedText type="code" themeColor="textSecondary">
-              JUDUL SKRIPSI
-            </ThemedText>
-            <ThemedText type="default" style={styles.judulSkripsi}>
-              &ldquo;{data.judulSkripsi}&rdquo;
-            </ThemedText>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Dosen Pembimbing
-            </ThemedText>
-            <ThemedText type="smallBold" style={styles.dosenText}>
-              {data.pembimbingSkripsi}
-            </ThemedText>
-          </View>
-
-          <View style={styles.divider} />
-
-          <View style={styles.infoRow}>
-            <ThemedText type="small" themeColor="textSecondary">
-              Dosen Wali
-            </ThemedText>
-            <ThemedText type="smallBold" style={styles.dosenText}>
-              {data.dosenWali}
-            </ThemedText>
-          </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </ThemedView>
 
-        {/* Tombol Logout */}
-        <Pressable
-          onPress={handleSignOut}
-          disabled={isAuthLoading}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed && styles.signOutButtonPressed,
-          ]}>
-          {isAuthLoading ? (
-            <ActivityIndicator color="#E02424" size="small" />
-          ) : (
-            <ThemedText type="smallBold" style={styles.signOutText}>
-              Keluar Akun Mahasiswa (Sign Out)
+        {/* Tabel / List Mahasiswa Skripsi */}
+        {loading ? (
+          <View style={styles.tableLoading}>
+            <ActivityIndicator size="large" color="#3c87f7" />
+            <ThemedText type="small" themeColor="textSecondary">
+              Memuat data tabel dari Cloud Firestore...
             </ThemedText>
-          )}
-        </Pressable>
+          </View>
+        ) : filteredList.length === 0 ? (
+          <ThemedView type="backgroundElement" style={styles.emptyCard}>
+            <ThemedText type="subtitle">📋</ThemedText>
+            <ThemedText type="smallBold">Tidak ada data mahasiswa yang cocok</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              Coba ganti kata kunci pencarian atau ubah filter status.
+            </ThemedText>
+          </ThemedView>
+        ) : (
+          <View style={styles.tableListWrapper}>
+            {filteredList.map((mhs, index) => {
+              const badge = getStatusBadgeStyle(mhs.statusSkripsi);
+              return (
+                <ThemedView key={mhs.nim + index} type="backgroundElement" style={styles.mhsRowCard}>
+                  {/* Top Row: Mahasiswa Identity & Status */}
+                  <View style={styles.rowHeader}>
+                    <View style={styles.mhsIdentity}>
+                      <View style={styles.avatarThumbnailWrapper}>
+                        {mhs.fotoUrl ? (
+                          <Image
+                            source={{ uri: mhs.fotoUrl }}
+                            style={styles.avatarThumbnail}
+                            contentFit="cover"
+                          />
+                        ) : (
+                          <View style={styles.avatarThumbnailFallback}>
+                            <ThemedText type="code" style={{ color: '#fff', fontSize: 12 }}>
+                              {mhs.nama.charAt(0)}
+                            </ThemedText>
+                          </View>
+                        )}
+                      </View>
+                      <View>
+                        <ThemedText type="smallBold" style={styles.mhsName}>
+                          {mhs.nama}
+                        </ThemedText>
+                        <ThemedText type="code" style={styles.mhsNim}>
+                          NIM: {mhs.nim} • {mhs.jurusan}
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: badge.bg, borderColor: badge.border },
+                      ]}>
+                      <ThemedText type="code" style={[styles.statusBadgeText, { color: badge.text }]}>
+                        {mhs.statusSkripsi || 'Bimbingan'}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Middle Row: Judul Skripsi */}
+                  <View style={styles.thesisBox}>
+                    <ThemedText type="code" themeColor="textSecondary" style={styles.thesisLabel}>
+                      JUDUL SKRIPSI:
+                    </ThemedText>
+                    <ThemedText type="smallBold" style={styles.thesisTitle}>
+                      &ldquo;{mhs.judulSkripsi}&rdquo;
+                    </ThemedText>
+                  </View>
+
+                  {/* Bottom Row: Dosen Pembimbing & Actions */}
+                  <View style={styles.rowFooter}>
+                    <View style={styles.pembimbingInfo}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Pembimbing:
+                      </ThemedText>
+                      <ThemedText type="small" style={styles.pembimbingName}>
+                        {mhs.pembimbingSkripsi}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.actionButtonsRow}>
+                      <Pressable
+                        onPress={() => setSelectedMhs(mhs)}
+                        style={styles.detailBtn}>
+                        <ThemedText type="code" style={styles.detailBtnText}>
+                          Detail
+                        </ThemedText>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => handleOpenEdit(mhs)}
+                        style={styles.editBtn}>
+                        <ThemedText type="code" style={styles.editBtnText}>
+                          Edit
+                        </ThemedText>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => handleDelete(mhs)}
+                        style={styles.deleteBtn}>
+                        <ThemedText type="code" style={styles.deleteBtnText}>
+                          ✕
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </View>
+                </ThemedView>
+              );
+            })}
+          </View>
+        )}
       </View>
 
-      {/* Modal Edit Data Mahasiswa */}
+      {/* MODAL 1: Detail Lengkap Mahasiswa */}
       <Modal
-        visible={isEditing}
+        visible={!!selectedMhs}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setIsEditing(false)}>
+        onRequestClose={() => setSelectedMhs(null)}>
         <View style={styles.modalOverlay}>
           <ThemedView type="background" style={styles.modalContent}>
-            <ThemedText type="subtitle" style={styles.modalTitle}>
-              Edit Data Mahasiswa
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.modalSubtitle}>
-              Perbarui data mahasiswa yang tersimpan di database Firestore
-            </ThemedText>
+            {selectedMhs && (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <ThemedText type="subtitle" style={styles.modalTitle}>
+                    Detail Skripsi Mahasiswa
+                  </ThemedText>
+                  <Pressable onPress={() => setSelectedMhs(null)} style={styles.closeModalBtn}>
+                    <ThemedText type="smallBold">✕</ThemedText>
+                  </Pressable>
+                </View>
 
-            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold">NIM</ThemedText>
+                <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+                  {/* Profil Singkat */}
+                  <View style={styles.detailProfileBox}>
+                    <View style={styles.detailPhotoWrapper}>
+                      {selectedMhs.fotoUrl ? (
+                        <Image
+                          source={{ uri: selectedMhs.fotoUrl }}
+                          style={styles.detailPhoto}
+                          contentFit="cover"
+                        />
+                      ) : (
+                        <View style={styles.detailPhotoFallback}>
+                          <ThemedText type="subtitle" style={{ color: '#fff' }}>
+                            {selectedMhs.nama.charAt(0)}
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText type="smallBold" style={{ fontSize: 17 }}>
+                        {selectedMhs.nama}
+                      </ThemedText>
+                      <ThemedText type="code" style={{ color: '#3c87f7' }}>
+                        NIM: {selectedMhs.nim}
+                      </ThemedText>
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {selectedMhs.jurusan} • Fak. {selectedMhs.fakultas}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {/* Judul Skripsi Lengkap */}
+                  <View style={styles.detailSection}>
+                    <ThemedText type="code" themeColor="textSecondary">
+                      JUDUL TUGAS AKHIR / SKRIPSI
+                    </ThemedText>
+                    <ThemedText type="default" style={styles.detailJudul}>
+                      &ldquo;{selectedMhs.judulSkripsi}&rdquo;
+                    </ThemedText>
+                  </View>
+
+                  {/* Detail Grid */}
+                  <View style={styles.detailGrid}>
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Status Bimbingan
+                      </ThemedText>
+                      <ThemedText type="smallBold">
+                        {selectedMhs.statusSkripsi || 'Bimbingan'}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Dosen Pembimbing
+                      </ThemedText>
+                      <ThemedText type="smallBold">
+                        {selectedMhs.pembimbingSkripsi}
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Dosen Wali
+                      </ThemedText>
+                      <ThemedText type="smallBold">{selectedMhs.dosenWali}</ThemedText>
+                    </View>
+
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        IPK / SKS
+                      </ThemedText>
+                      <ThemedText type="smallBold">
+                        IPK {selectedMhs.ipk.toFixed(2)} • {selectedMhs.sksSelesai} SKS
+                      </ThemedText>
+                    </View>
+
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Email Mahasiswa
+                      </ThemedText>
+                      <ThemedText type="code">{selectedMhs.email}</ThemedText>
+                    </View>
+
+                    <View style={styles.detailGridItem}>
+                      <ThemedText type="code" themeColor="textSecondary">
+                        Semester / Angkatan
+                      </ThemedText>
+                      <ThemedText type="smallBold">
+                        Semester {selectedMhs.semester} ({selectedMhs.angkatan})
+                      </ThemedText>
+                    </View>
+                  </View>
+                </ScrollView>
+
+                <View style={styles.modalFooterRow}>
+                  <Pressable
+                    onPress={() => {
+                      const m = selectedMhs;
+                      setSelectedMhs(null);
+                      handleOpenEdit(m);
+                    }}
+                    style={styles.modalEditFullBtn}>
+                    <ThemedText type="smallBold" style={{ color: '#fff' }}>
+                      ✏️ Edit Skripsi Ini
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </>
+            )}
+          </ThemedView>
+        </View>
+      </Modal>
+
+      {/* MODAL 2: Form Tambah / Edit Mahasiswa */}
+      <Modal
+        visible={isFormOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsFormOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <ThemedView type="background" style={styles.modalContent}>
+            <View style={styles.modalHeaderRow}>
+              <ThemedText type="subtitle" style={styles.modalTitle}>
+                {isEditing ? 'Edit Data Skripsi' : 'Tambah Mahasiswa Baru'}
+              </ThemedText>
+              <Pressable onPress={() => setIsFormOpen(false)} style={styles.closeModalBtn}>
+                <ThemedText type="smallBold">✕</ThemedText>
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <View style={styles.formGroup}>
+                <ThemedText type="smallBold">NIM Mahasiswa</ThemedText>
                 <TextInput
-                  value={editNim}
-                  onChangeText={setEditNim}
-                  style={styles.textInput}
-                  placeholder="Contoh: 24060121130089"
+                  value={formNim}
+                  onChangeText={setFormNim}
+                  placeholder="24060121130089"
                   placeholderTextColor="#888"
+                  style={styles.textInput}
                 />
               </View>
 
-              <View style={styles.inputGroup}>
+              <View style={styles.formGroup}>
                 <ThemedText type="smallBold">Nama Lengkap</ThemedText>
                 <TextInput
-                  value={editNama}
-                  onChangeText={setEditNama}
-                  style={styles.textInput}
+                  value={formNama}
+                  onChangeText={setFormNama}
                   placeholder="Nama Lengkap Mahasiswa"
                   placeholderTextColor="#888"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold">Program Studi / Jurusan</ThemedText>
-                <TextInput
-                  value={editJurusan}
-                  onChangeText={setEditJurusan}
                   style={styles.textInput}
-                  placeholder="Informatika"
-                  placeholderTextColor="#888"
                 />
               </View>
 
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold">Fakultas</ThemedText>
+              <View style={styles.formGroup}>
+                <ThemedText type="smallBold">Judul Skripsi / Tugas Akhir</ThemedText>
                 <TextInput
-                  value={editFakultas}
-                  onChangeText={setEditFakultas}
-                  style={styles.textInput}
-                  placeholder="Sains dan Matematika"
-                  placeholderTextColor="#888"
-                />
-              </View>
-
-              <View style={styles.inputRow}>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <ThemedText type="smallBold">Semester</ThemedText>
-                  <TextInput
-                    value={editSemester}
-                    onChangeText={setEditSemester}
-                    keyboardType="numeric"
-                    style={styles.textInput}
-                    placeholder="7"
-                    placeholderTextColor="#888"
-                  />
-                </View>
-                <View style={[styles.inputGroup, { flex: 1 }]}>
-                  <ThemedText type="smallBold">IPK</ThemedText>
-                  <TextInput
-                    value={editIpk}
-                    onChangeText={setEditIpk}
-                    keyboardType="decimal-pad"
-                    style={styles.textInput}
-                    placeholder="3.84"
-                    placeholderTextColor="#888"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <ThemedText type="smallBold">Judul Skripsi</ThemedText>
-                <TextInput
-                  value={editJudul}
-                  onChangeText={setEditJudul}
+                  value={formJudul}
+                  onChangeText={setFormJudul}
                   multiline
                   numberOfLines={3}
-                  style={[styles.textInput, styles.textArea]}
-                  placeholder="Tuliskan judul tugas akhir atau skripsi Anda..."
+                  placeholder="Tuliskan judul penelitian skripsi..."
                   placeholderTextColor="#888"
+                  style={[styles.textInput, styles.textArea]}
                 />
+              </View>
+
+              <View style={styles.formGroup}>
+                <ThemedText type="smallBold">Dosen Pembimbing Skripsi</ThemedText>
+                <TextInput
+                  value={formPembimbing}
+                  onChangeText={setFormPembimbing}
+                  placeholder="Nama & Gelar Dosen Pembimbing"
+                  placeholderTextColor="#888"
+                  style={styles.textInput}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <ThemedText type="smallBold">Tahap / Status Bimbingan</ThemedText>
+                <View style={styles.statusChipsGrid}>
+                  {(['Bimbingan', 'Seminar Proposal', 'Sidang Skripsi', 'Lulus'] as const).map(
+                    (st) => {
+                      const selected = formStatusSkripsi === st;
+                      return (
+                        <Pressable
+                          key={st}
+                          onPress={() => setFormStatusSkripsi(st)}
+                          style={[styles.statusSelectChip, selected && styles.statusSelectChipActive]}>
+                          <ThemedText
+                            type="code"
+                            style={[
+                              styles.statusSelectText,
+                              selected && styles.statusSelectTextActive,
+                            ]}>
+                            {st}
+                          </ThemedText>
+                        </Pressable>
+                      );
+                    }
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <ThemedText type="smallBold">Program Studi</ThemedText>
+                  <TextInput
+                    value={formJurusan}
+                    onChangeText={setFormJurusan}
+                    style={styles.textInput}
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <ThemedText type="smallBold">Angkatan</ThemedText>
+                  <TextInput
+                    value={formAngkatan}
+                    onChangeText={setFormAngkatan}
+                    style={styles.textInput}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.formRow}>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <ThemedText type="smallBold">IPK</ThemedText>
+                  <TextInput
+                    value={formIpk}
+                    onChangeText={setFormIpk}
+                    keyboardType="decimal-pad"
+                    style={styles.textInput}
+                  />
+                </View>
+                <View style={[styles.formGroup, { flex: 1 }]}>
+                  <ThemedText type="smallBold">SKS Selesai</ThemedText>
+                  <TextInput
+                    value={formSks}
+                    onChangeText={setFormSks}
+                    keyboardType="numeric"
+                    style={styles.textInput}
+                  />
+                </View>
               </View>
             </ScrollView>
 
-            <View style={styles.modalButtons}>
+            <View style={styles.modalFooterRow}>
               <Pressable
-                onPress={() => setIsEditing(false)}
+                onPress={() => setIsFormOpen(false)}
                 disabled={saving}
-                style={styles.modalCancelButton}>
+                style={styles.modalCancelBtn}>
                 <ThemedText type="smallBold">Batal</ThemedText>
               </Pressable>
               <Pressable
-                onPress={handleSaveEdit}
+                onPress={handleSaveForm}
                 disabled={saving}
-                style={styles.modalSaveButton}>
+                style={styles.modalSaveBtn}>
                 {saving ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <ThemedText type="smallBold" style={styles.modalSaveText}>
-                    Simpan ke Firestore
+                  <ThemedText type="smallBold" style={{ color: '#fff' }}>
+                    {isEditing ? 'Simpan Perubahan' : 'Tambahkan ke Firestore'}
                   </ThemedText>
                 )}
               </Pressable>
@@ -437,252 +773,289 @@ export function HomeView() {
 }
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  loadingText: {
-    fontSize: 14,
-  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.five,
+    paddingVertical: Spacing.four,
   },
   container: {
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-    gap: Spacing.four,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 26,
-    fontWeight: '700',
-  },
-  editButton: {
-    backgroundColor: '#3c87f715',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#3c87f740',
-  },
-  editText: {
-    color: '#3c87f7',
-    fontSize: 13,
-  },
-  ktmCard: {
-    backgroundColor: '#1E3A8A',
-    borderRadius: 20,
-    padding: Spacing.four,
     gap: Spacing.three,
-    shadowColor: '#1E3A8A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
   },
-  ktmTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFFFFF33',
-    paddingBottom: Spacing.two,
+  adminHeaderCard: {
+    padding: Spacing.three,
+    borderRadius: 18,
   },
-  ktmUni: {
-    color: '#93C5FD',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  ktmCardTitle: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  activeBadge: {
-    backgroundColor: '#065F46',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#34D399',
-  },
-  activeBadgeText: {
-    color: '#D1FAE5',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  ktmBody: {
+  adminProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
   },
-  ktmPhotoWrapper: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: 12,
-    overflow: 'hidden',
+  adminAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
-  ktmPhoto: {
-    width: 72,
-    height: 90,
-  },
-  ktmPhotoFallback: {
-    width: 72,
-    height: 90,
-    backgroundColor: '#2563EB',
+  adminAvatarFallback: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#3c87f7',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  photoInitial: {
-    color: '#FFFFFF',
-    fontSize: 28,
-  },
-  ktmInfo: {
+  adminInfo: {
     flex: 1,
-    gap: 3,
-  },
-  ktmNama: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  ktmNim: {
-    color: '#FCD34D',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  ktmProdi: {
-    color: '#E0E7FF',
-    fontSize: 13,
-  },
-  ktmFakultas: {
-    color: '#BFDBFE',
-    fontSize: 12,
-  },
-  ktmFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#FFFFFF22',
-    paddingTop: Spacing.two,
-  },
-  ktmEmail: {
-    color: '#BFDBFE',
-    fontSize: 11,
-  },
-  ktmAngkatan: {
-    color: '#93C5FD',
-    fontSize: 11,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  statBox: {
-    flex: 1,
-    padding: Spacing.three,
-    borderRadius: 16,
-    alignItems: 'center',
     gap: 2,
   },
-  statValueHighlight: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#34A853',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  statSub: {
-    fontSize: 10,
-    color: '#8E918F',
-  },
-  card: {
-    padding: Spacing.four,
-    borderRadius: 18,
-    gap: Spacing.two,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  cardTitle: {
-    fontSize: 15,
-  },
-  skripsiBadge: {
-    backgroundColor: '#3c87f71A',
+  adminBadge: {
+    backgroundColor: '#3c87f722',
+    alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  skripsiBadgeText: {
+  adminBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
     color: '#3c87f7',
-    fontSize: 10,
+  },
+  adminName: {
+    fontSize: 15,
+  },
+  adminEmail: {
+    fontSize: 11,
+  },
+  adminSignOutBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F98080',
+    backgroundColor: '#FDE8E822',
+  },
+  adminSignOutText: {
+    color: '#E02424',
+    fontSize: 11,
     fontWeight: '700',
   },
-  skripsiContent: {
-    gap: 4,
-    marginTop: 2,
-  },
-  judulSkripsi: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#8E918F33',
-    marginVertical: 4,
-  },
-  infoRow: {
+  statsHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 4,
   },
-  dosenText: {
-    fontSize: 13,
-    textAlign: 'right',
-    maxWidth: '60%',
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: '800',
   },
-  signOutButton: {
-    height: 48,
-    borderRadius: 24,
+  addButton: {
+    backgroundColor: '#3c87f7',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    shadowColor: '#3c87f7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  metricCard: {
+    flex: 1,
+    padding: Spacing.two,
+    borderRadius: 14,
+    alignItems: 'center',
+    gap: 1,
+  },
+  metricNum: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  metricSub: {
+    fontSize: 9,
+  },
+  filterSection: {
+    padding: Spacing.three,
+    borderRadius: 16,
+    gap: Spacing.two,
+  },
+  searchInput: {
+    height: 40,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#F98080',
-    backgroundColor: '#FDE8E833',
+    borderColor: '#8E918F33',
+    paddingHorizontal: 12,
+    fontSize: 13,
+    backgroundColor: '#FFFFFF10',
+    color: '#1F1F1F',
+  },
+  filterChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#8E918F33',
+    backgroundColor: '#8E918F10',
+    marginRight: 6,
+  },
+  filterChipActive: {
+    backgroundColor: '#3c87f7',
+    borderColor: '#3c87f7',
+  },
+  filterChipText: {
+    fontSize: 11,
+    color: '#60646C',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  tableLoading: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyCard: {
+    padding: Spacing.five,
+    borderRadius: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  tableListWrapper: {
+    gap: Spacing.two,
+  },
+  mhsRowCard: {
+    padding: Spacing.three,
+    borderRadius: 16,
+    gap: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#8E918F25',
+  },
+  rowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  mhsIdentity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  avatarThumbnailWrapper: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  avatarThumbnail: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  avatarThumbnailFallback: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: Spacing.two,
   },
-  signOutButtonPressed: {
-    opacity: 0.7,
-  },
-  signOutText: {
-    color: '#E02424',
+  mhsName: {
     fontSize: 14,
+  },
+  mhsNim: {
+    fontSize: 11,
+    color: '#8E918F',
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  thesisBox: {
+    backgroundColor: '#8E918F10',
+    padding: 10,
+    borderRadius: 10,
+    gap: 2,
+  },
+  thesisLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  thesisTitle: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  rowFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 2,
+  },
+  pembimbingInfo: {
+    flex: 1,
+    gap: 1,
+  },
+  pembimbingName: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  detailBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#3c87f715',
+  },
+  detailBtnText: {
+    fontSize: 11,
+    color: '#3c87f7',
+    fontWeight: '700',
+  },
+  editBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#8E918F20',
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  deleteBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#FDE8E8',
+  },
+  deleteBtnText: {
+    fontSize: 11,
+    color: '#9B1C1C',
+    fontWeight: '800',
   },
   modalOverlay: {
     flex: 1,
@@ -693,25 +1066,87 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: Spacing.four,
-    maxHeight: '85%',
+    maxHeight: '88%',
     gap: Spacing.two,
   },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
-  modalSubtitle: {
-    fontSize: 13,
-    marginBottom: Spacing.two,
+  closeModalBtn: {
+    padding: 6,
   },
-  modalForm: {
+  modalBody: {
+    marginVertical: Spacing.two,
+  },
+  detailProfileBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    paddingBottom: Spacing.three,
+    borderBottomWidth: 1,
+    borderBottomColor: '#8E918F25',
     marginBottom: Spacing.three,
   },
-  inputGroup: {
+  detailPhotoWrapper: {
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  detailPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  detailPhotoFallback: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3c87f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailSection: {
+    gap: 4,
+    marginBottom: Spacing.three,
+  },
+  detailJudul: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    lineHeight: 22,
+  },
+  detailGrid: {
+    gap: Spacing.two,
+  },
+  detailGridItem: {
+    gap: 2,
+    backgroundColor: '#8E918F10',
+    padding: 10,
+    borderRadius: 10,
+  },
+  modalFooterRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingTop: Spacing.two,
+  },
+  modalEditFullBtn: {
+    flex: 1,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#3c87f7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formGroup: {
     marginBottom: Spacing.three,
     gap: 6,
   },
-  inputRow: {
+  formRow: {
     flexDirection: 'row',
     gap: Spacing.two,
   },
@@ -721,20 +1156,40 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    fontSize: 14,
-    color: '#1F1F1F',
+    fontSize: 13,
     backgroundColor: '#FFFFFF10',
+    color: '#1F1F1F',
   },
   textArea: {
     minHeight: 70,
     textAlignVertical: 'top',
   },
-  modalButtons: {
+  statusChipsGrid: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    paddingTop: Spacing.two,
+    flexWrap: 'wrap',
+    gap: 8,
   },
-  modalCancelButton: {
+  statusSelectChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#8E918F40',
+    backgroundColor: '#8E918F10',
+  },
+  statusSelectChipActive: {
+    backgroundColor: '#3c87f7',
+    borderColor: '#3c87f7',
+  },
+  statusSelectText: {
+    fontSize: 11,
+    color: '#60646C',
+  },
+  statusSelectTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  modalCancelBtn: {
     flex: 1,
     height: 44,
     borderRadius: 22,
@@ -743,15 +1198,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalSaveButton: {
+  modalSaveBtn: {
     flex: 2,
     height: 44,
     borderRadius: 22,
     backgroundColor: '#3c87f7',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  modalSaveText: {
-    color: '#FFFFFF',
   },
 });

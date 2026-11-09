@@ -29,10 +29,10 @@ export function LoginView() {
             </ThemedText>
           </View>
           <ThemedText type="subtitle" style={styles.title}>
-            Portal Mahasiswa
+            Portal Admin Skripsi
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.subtitle}>
-            Sistem Informasi Akademik &amp; Pengelolaan Skripsi
+            Sistem Informasi &amp; Database Skripsi Mahasiswa
           </ThemedText>
         </View>
 
@@ -53,10 +53,10 @@ export function LoginView() {
         {/* Main Action Card */}
         <ThemedView type="backgroundElement" style={styles.actionCard}>
           <ThemedText type="smallBold" style={styles.actionTitle}>
-            Masuk dengan Akun Mahasiswa
+            Masuk sebagai Administrator
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.actionDesc}>
-            Silakan login menggunakan akun Google Anda untuk mengakses data akademik dan progres skripsi.
+            Masuk menggunakan akun Google untuk mengakses dan mengelola database mahasiswa yang mengambil skripsi.
           </ThemedText>
 
           <View style={styles.buttonWrapper}>
