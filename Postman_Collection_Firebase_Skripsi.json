@@ -1,0 +1,550 @@
+{
+  "info": {
+    "_postman_id": "f8a92b31-c4e1-4c91-b921-72a58d120912",
+    "name": "Firebase & Firestore REST API - Portal Skripsi UNDIP",
+    "description": "Koleksi Postman lengkap untuk pengujian integrasi Firebase Authentication dan Cloud Firestore REST API pada aplikasi Portal Skripsi Undip.\n\nVariabel yang digunakan:\n- `projectId`: ID Project Firebase (`appbaru-8a5da`)\n- `apiKey`: Web API Key Firebase\n- `idToken`: Token autentikasi Firebase dari hasil login",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "projectId",
+      "value": "appbaru-8a5da",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "AIzaSyBxTNIy5sFRAvcIpaGUji_DVIlOnz0qk3k",
+      "type": "string"
+    },
+    {
+      "key": "idToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok.apps.googleusercontent.com",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Firebase Authentication",
+      "description": "Endpoint REST API Google Identity Toolkit untuk Autentikasi Pengguna",
+      "item": [
+        {
+          "name": "1.1 Registrasi Akun Baru (Sign Up)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"mahasiswa_baru@students.undip.ac.id\",\n  \"password\": \"undip123456\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:signUp"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mendaftarkan pengguna baru dengan email dan password. Mengembalikan `localId` (UID) dan `idToken`."
+          }
+        },
+        {
+          "name": "1.2 Masuk dengan Email & Password (Sign In)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.idToken) {",
+                  "    pm.collectionVariables.set('idToken', jsonData.idToken);",
+                  "    console.log('idToken berhasil disimpan ke variabel koleksi');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@undip.ac.id\",\n  \"password\": \"adminundip_password\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:signInWithPassword"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Otentikasi login email dan password. Script otomatis menyimpan `idToken` ke variabel koleksi Postman."
+          }
+        },
+        {
+          "name": "1.3 Update Profil Pengguna (Display Name)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"{{idToken}}\",\n  \"displayName\": \"Henri Tantyoko\",\n  \"returnSecureToken\": true\n}"
+            },
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:update?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:update"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Memperbarui nama tampilan pengguna di Firebase Authentication."
+          }
+        },
+        {
+          "name": "1.4 Ambil Data Pengguna (Lookup User Profile)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"{{idToken}}\"\n}"
+            },
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:lookup"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Melihat detail metadata akun pengguna berdasarkan `idToken`."
+          }
+        },
+        {
+          "name": "1.5 Kirim Email Reset Kata Sandi",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestType\": \"PASSWORD_RESET\",\n  \"email\": \"henritantyoko@gmail.com\"\n}"
+            },
+            "url": {
+              "raw": "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["identitytoolkit", "googleapis", "com"],
+              "path": ["v1", "accounts:sendOobCode"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengirimkan email tautan pemulihan kata sandi kepada pengguna."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Google OAuth 2.0 (PKCE Flow)",
+      "description": "Endpoint Google OAuth 2.0 untuk Otorisasi dan Pertukaran Kode Token",
+      "item": [
+        {
+          "name": "2.1 URL Otorisasi Google (WebAuthSession / Browser)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://accounts.google.com/o/oauth2/v2/auth?client_id={{clientId}}&redirect_uri=com.googleusercontent.apps.713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok:/oauth2redirect&response_type=code&scope=openid%20profile%20email&code_challenge=CONTOH_CODE_CHALLENGE_BASE64URL&code_challenge_method=S256&prompt=select_account",
+              "protocol": "https",
+              "host": ["accounts", "google", "com"],
+              "path": ["o", "oauth2", "v2", "auth"],
+              "query": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "com.googleusercontent.apps.713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok:/oauth2redirect"
+                },
+                {
+                  "key": "response_type",
+                  "value": "code"
+                },
+                {
+                  "key": "scope",
+                  "value": "openid profile email"
+                },
+                {
+                  "key": "code_challenge",
+                  "value": "CONTOH_CODE_CHALLENGE_BASE64URL"
+                },
+                {
+                  "key": "code_challenge_method",
+                  "value": "S256"
+                },
+                {
+                  "key": "prompt",
+                  "value": "select_account"
+                }
+              ]
+            },
+            "description": "Membuka consent screen pemilihan akun Google dengan perlindungan PKCE (response_type=code)."
+          }
+        },
+        {
+          "name": "2.2 Tukar Authorization Code dengan Token Google (Token Exchange)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "grant_type",
+                  "value": "authorization_code",
+                  "type": "text"
+                },
+                {
+                  "key": "code",
+                  "value": "MASUKKAN_AUTHORIZATION_CODE_DARI_REDIRECT",
+                  "type": "text"
+                },
+                {
+                  "key": "redirect_uri",
+                  "value": "com.googleusercontent.apps.713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok:/oauth2redirect",
+                  "type": "text"
+                },
+                {
+                  "key": "code_verifier",
+                  "value": "MASUKKAN_CODE_VERIFIER_ORIGINAL",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://oauth2.googleapis.com/token",
+              "protocol": "https",
+              "host": ["oauth2", "googleapis", "com"],
+              "path": ["token"]
+            },
+            "description": "Menukarkan `code` dari redirect URI dengan Google ID Token dan Access Token menggunakan `code_verifier`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Cloud Firestore - Koleksi Users (User Management & RBAC)",
+      "description": "Manajemen data akun, peran akses (Admin vs Mahasiswa), dan verifikasi password",
+      "item": [
+        {
+          "name": "3.1 Ambil Semua Akun Pengguna (Get All Users)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/users?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "users"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengambil seluruh data akun dari koleksi `users` untuk panel User Management Admin."
+          }
+        },
+        {
+          "name": "3.2 Ambil 1 User Berdasarkan ID / Email (Get User by Doc ID)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/users/henritantyoko_gmail_com?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "users", "henritantyoko_gmail_com"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengambil detail profil akun pengguna tertentu."
+          }
+        },
+        {
+          "name": "3.3 Buat / Update Pengguna Baru (Create/Upsert User)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"uid\": { \"stringValue\": \"usr_manual_01\" },\n    \"nama\": { \"stringValue\": \"Budi Santoso\" },\n    \"email\": { \"stringValue\": \"budi.santoso@students.undip.ac.id\" },\n    \"password\": { \"stringValue\": \"budi123456\" },\n    \"role\": { \"stringValue\": \"user\" },\n    \"nim\": { \"stringValue\": \"24060121140020\" },\n    \"status\": { \"stringValue\": \"Aktif\" },\n    \"createdAt\": { \"stringValue\": \"2026-11-09T06:00:00.000Z\" },\n    \"lastLogin\": { \"stringValue\": \"2026-11-09T06:00:00.000Z\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/users/budi_santoso_students_undip_ac_id?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "users", "budi_santoso_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Menyimpan atau memperbarui data akun di koleksi `users` lengkap dengan field `password` dan `role`."
+          }
+        },
+        {
+          "name": "3.4 Ubah Role Pengguna (Promote/Demote Role via fieldMask)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"role\": { \"stringValue\": \"admin\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/users/budi_santoso_students_undip_ac_id?updateMask.fieldPaths=role&key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "users", "budi_santoso_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "updateMask.fieldPaths",
+                  "value": "role"
+                },
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengubah role pengguna menjadi `admin` atau `user` secara spesifik tanpa menimpa field lainnya."
+          }
+        },
+        {
+          "name": "3.5 Hapus Dokumen Pengguna (Delete User)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/users/budi_santoso_students_undip_ac_id?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "users", "budi_santoso_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Menghapus dokumen user tertentu dari koleksi `users`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Cloud Firestore - Koleksi Mahasiswa (Data Skripsi & Akademik)",
+      "description": "Pengelolaan data akademik, judul skripsi, pembimbing, dan status bimbingan mahasiswa",
+      "item": [
+        {
+          "name": "4.1 Ambil Seluruh Data Mahasiswa & Skripsi (Get All Mahasiswa)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/mahasiswa?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "mahasiswa"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengambil seluruh dokumen mahasiswa untuk ditampilkan pada tabel dashboard Admin."
+          }
+        },
+        {
+          "name": "4.2 Ambil Data 1 Mahasiswa Berdasarkan Email (Get Student by Doc ID)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/mahasiswa/dimas_prasetyo_students_undip_ac_id?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "mahasiswa", "dimas_prasetyo_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengambil data profil skripsi mahasiswa personal (digunakan pada MahasiswaHomeView)."
+          }
+        },
+        {
+          "name": "4.3 Tambah / Simpan Data Mahasiswa Baru (Create/Upsert Mahasiswa)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"nim\": { \"stringValue\": \"24060121140020\" },\n    \"nama\": { \"stringValue\": \"Budi Santoso\" },\n    \"email\": { \"stringValue\": \"budi.santoso@students.undip.ac.id\" },\n    \"fotoUrl\": { \"stringValue\": \"https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80\" },\n    \"fakultas\": { \"stringValue\": \"Sains dan Matematika\" },\n    \"jurusan\": { \"stringValue\": \"Informatika\" },\n    \"angkatan\": { \"stringValue\": \"2021\" },\n    \"semester\": { \"integerValue\": \"7\" },\n    \"statusAkademik\": { \"stringValue\": \"Aktif\" },\n    \"statusSkripsi\": { \"stringValue\": \"Bimbingan\" },\n    \"ipk\": { \"doubleValue\": 3.82 },\n    \"sksSelesai\": { \"integerValue\": \"138\" },\n    \"dosenWali\": { \"stringValue\": \"Prof. Dr. Kusworo Adi, S.Si., M.T.\" },\n    \"judulSkripsi\": { \"stringValue\": \"Penerapan Transfer Learning ResNet-50 untuk Deteksi Dini Penyakit Tanaman Padi\" },\n    \"pembimbingSkripsi\": { \"stringValue\": \"Dr. Aris Sugiharto, S.Si., M.Kom.\" },\n    \"updatedAt\": { \"stringValue\": \"2026-11-09T06:00:00.000Z\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/mahasiswa/budi_santoso_students_undip_ac_id?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "mahasiswa", "budi_santoso_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Menambahkan mahasiswa baru ke database Firestore atau memperbarui seluruh datanya."
+          }
+        },
+        {
+          "name": "4.4 Perbarui Judul Skripsi Saja (Partial Update / Edit Judul)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": {\n    \"judulSkripsi\": { \"stringValue\": \"Optimasi Hyperparameter Model YOLOv8 untuk Deteksi Rambu Lalu Lintas pada Smart Car\" },\n    \"updatedAt\": { \"stringValue\": \"2026-11-09T06:30:00.000Z\" }\n  }\n}"
+            },
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/mahasiswa/dimas_prasetyo_students_undip_ac_id?updateMask.fieldPaths=judulSkripsi&updateMask.fieldPaths=updatedAt&key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "mahasiswa", "dimas_prasetyo_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "updateMask.fieldPaths",
+                  "value": "judulSkripsi"
+                },
+                {
+                  "key": "updateMask.fieldPaths",
+                  "value": "updatedAt"
+                },
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Mengedit judul skripsi mahasiswa secara terisolasi tanpa mengubah nilai field yang lain."
+          }
+        },
+        {
+          "name": "4.5 Hapus Data Mahasiswa (Delete Mahasiswa)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "https://firestore.googleapis.com/v1/projects/{{projectId}}/databases/(default)/documents/mahasiswa/budi_santoso_students_undip_ac_id?key={{apiKey}}",
+              "protocol": "https",
+              "host": ["firestore", "googleapis", "com"],
+              "path": ["v1", "projects", "{{projectId}}", "databases", "(default)", "documents", "mahasiswa", "budi_santoso_students_undip_ac_id"],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "{{apiKey}}"
+                }
+              ]
+            },
+            "description": "Menghapus dokumen mahasiswa dari koleksi `mahasiswa` Firestore."
+          }
+        }
+      ]
+    }
+  ]
+}
