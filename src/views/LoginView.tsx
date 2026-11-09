@@ -4,13 +4,11 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Platform,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -27,14 +25,14 @@ export function LoginView() {
         <View style={styles.header}>
           <View style={[styles.badge, { backgroundColor: theme.backgroundElement }]}>
             <ThemedText type="code" style={styles.badgeText}>
-              UNDIP • SKRIPSI APP
+              UNIVERSITAS DIPONEGORO
             </ThemedText>
           </View>
           <ThemedText type="subtitle" style={styles.title}>
-            Sign in with Google
+            Portal Mahasiswa
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.subtitle}>
-            Aplikasi autentikasi terhubung dengan Firebase &amp; Google Services Info Plist
+            Sistem Informasi Akademik &amp; Pengelolaan Skripsi
           </ThemedText>
         </View>
 
@@ -52,13 +50,13 @@ export function LoginView() {
           </View>
         )}
 
-        {/* Main Action Area */}
+        {/* Main Action Card */}
         <ThemedView type="backgroundElement" style={styles.actionCard}>
           <ThemedText type="smallBold" style={styles.actionTitle}>
-            Masuk ke Akun Anda
+            Masuk dengan Akun Mahasiswa
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.actionDesc}>
-            Gunakan akun Google yang terdaftar untuk mengakses aplikasi.
+            Silakan login menggunakan akun Google Anda untuk mengakses data akademik dan progres skripsi.
           </ThemedText>
 
           <View style={styles.buttonWrapper}>
@@ -69,64 +67,35 @@ export function LoginView() {
             />
           </View>
 
-          <ThemedText type="code" style={styles.securityNote}>
-            🔒 Menggunakan kredensial resmi OAuth 2.0
-          </ThemedText>
+          <View style={styles.infoBox}>
+            <ThemedText type="code" style={styles.infoBoxText}>
+              ℹ️ Akun Google otomatis terhubung dengan database mahasiswa Firestore
+            </ThemedText>
+          </View>
         </ThemedView>
 
-        {/* Info Integrasi GoogleService-Info.plist */}
-        <View style={styles.integrationSection}>
-          <ThemedText type="smallBold" style={styles.sectionHeader}>
-            Konfigurasi GoogleService-Info.plist
+        {/* Petunjuk Login Mahasiswa */}
+        <ThemedView type="backgroundElement" style={styles.guideCard}>
+          <ThemedText type="smallBold" style={styles.guideTitle}>
+            Petunjuk Masuk
           </ThemedText>
-
-          <ThemedView type="backgroundElement" style={styles.configCard}>
-            <View style={styles.configRow}>
-              <ThemedText type="code" themeColor="textSecondary">
-                PROJECT_ID
-              </ThemedText>
-              <ThemedText type="smallBold">
-                {GOOGLE_SERVICE_CONFIG.PROJECT_ID}
-              </ThemedText>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.configRow}>
-              <ThemedText type="code" themeColor="textSecondary">
-                BUNDLE_ID
-              </ThemedText>
-              <ThemedText type="code" style={styles.codeHighlight}>
-                {GOOGLE_SERVICE_CONFIG.BUNDLE_ID}
-              </ThemedText>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.configRowVertical}>
-              <ThemedText type="code" themeColor="textSecondary">
-                CLIENT_ID (iOS)
-              </ThemedText>
-              <ThemedText type="code" numberOfLines={1} style={styles.clientIdText}>
-                {GOOGLE_SERVICE_CONFIG.CLIENT_ID}
-              </ThemedText>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.statusRow}>
-              <View style={styles.statusIndicator}>
-                <View style={styles.statusDot} />
-                <ThemedText type="small">IS_SIGNIN_ENABLED</ThemedText>
-              </View>
-              <View style={styles.tagTrue}>
-                <ThemedText type="code" style={styles.tagText}>
-                  TRUE
-                </ThemedText>
-              </View>
-            </View>
-          </ThemedView>
-        </View>
+          <View style={styles.guideRow}>
+            <ThemedText type="smallBold" style={styles.guideBullet}>
+              1.
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
+              Pastikan akun Google yang digunakan aktif dan terdaftar.
+            </ThemedText>
+          </View>
+          <View style={styles.guideRow}>
+            <ThemedText type="smallBold" style={styles.guideBullet}>
+              2.
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
+              Setelah berhasil masuk, profil mahasiswa dan status akademik akan langsung ditampilkan.
+            </ThemedText>
+          </View>
+        </ThemedView>
       </View>
     </ScrollView>
   );
@@ -137,7 +106,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.five,
+    paddingVertical: Spacing.six,
   },
   container: {
     width: '100%',
@@ -150,15 +119,15 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   badge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 20,
     marginBottom: Spacing.one,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   title: {
     textAlign: 'center',
@@ -166,7 +135,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 340,
     lineHeight: 20,
   },
   errorBanner: {
@@ -191,8 +160,8 @@ const styles = StyleSheet.create({
     color: '#9B1C1C',
   },
   actionCard: {
-    padding: Spacing.four,
-    borderRadius: 20,
+    padding: Spacing.five,
+    borderRadius: 24,
     gap: Spacing.two,
     alignItems: 'center',
   },
@@ -202,76 +171,46 @@ const styles = StyleSheet.create({
   },
   actionDesc: {
     textAlign: 'center',
-    marginBottom: Spacing.two,
+    marginBottom: Spacing.three,
+    lineHeight: 20,
   },
   buttonWrapper: {
     width: '100%',
     maxWidth: 320,
   },
-  securityNote: {
-    marginTop: Spacing.one,
-    color: '#8E918F',
-    textAlign: 'center',
-  },
-  integrationSection: {
+  infoBox: {
     marginTop: Spacing.two,
-    gap: Spacing.two,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#8E918F15',
   },
-  sectionHeader: {
-    fontSize: 15,
-    marginLeft: 4,
+  infoBoxText: {
+    fontSize: 11,
+    textAlign: 'center',
+    color: '#60646C',
   },
-  configCard: {
+  guideCard: {
     padding: Spacing.four,
     borderRadius: 16,
     gap: Spacing.two,
   },
-  configRow: {
+  guideTitle: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  guideRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  configRowVertical: {
-    gap: 4,
-  },
-  clientIdText: {
-    fontSize: 11,
-    color: '#3c87f7',
-  },
-  codeHighlight: {
-    fontSize: 12,
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#8E918F33',
-    marginVertical: 4,
-  },
-  statusRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 2,
-  },
-  statusIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#34A853',
+  guideBullet: {
+    fontSize: 13,
+    color: '#3c87f7',
   },
-  tagTrue: {
-    backgroundColor: '#DEF7EC',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  tagText: {
-    color: '#03543F',
-    fontSize: 11,
-    fontWeight: '700',
+  guideText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
 });
