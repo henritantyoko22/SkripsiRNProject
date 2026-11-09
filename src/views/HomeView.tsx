@@ -22,11 +22,39 @@ import {
   saveMahasiswaData,
   deleteMahasiswaData,
 } from '@/services/studentService';
+import { MahasiswaHomeView } from '@/views/MahasiswaHomeView';
 
 export function HomeView() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
+  const [adminViewMode, setAdminViewMode] = useState<'admin' | 'mahasiswa_preview'>('admin');
   const colorScheme = useColorScheme();
   const isDark = false; // Selalu gunakan Light Mode sesuai permintaan
+
+  // Jika login sebagai role user biasa (Mahasiswa), tampilkan halaman profil & skripsi Mahasiswa
+  if (user?.role === 'user') {
+    return <MahasiswaHomeView />;
+  }
+
+  // Jika login sebagai Admin dan sedang preview tampilan mahasiswa
+  if (adminViewMode === 'mahasiswa_preview') {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+        <View style={styles.previewModeBanner}>
+          <ThemedText type="code" style={styles.previewModeText}>
+            Mode Preview Mahasiswa (Admin)
+          </ThemedText>
+          <Pressable
+            onPress={() => setAdminViewMode('admin')}
+            style={styles.previewModeBackBtn}>
+            <ThemedText type="smallBold" style={{ color: '#FFFFFF', fontSize: 12 }}>
+              ← Kembali ke Dashboard Admin
+            </ThemedText>
+          </Pressable>
+        </View>
+        <MahasiswaHomeView />
+      </View>
+    );
+  }
 
   const [mahasiswaList, setMahasiswaList] = useState<MahasiswaData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -280,14 +308,24 @@ export function HomeView() {
               </ThemedText>
             </View>
 
-            <Pressable
-              onPress={handleSignOut}
-              disabled={isAuthLoading}
-              style={styles.adminSignOutBtn}>
-              <ThemedText type="code" style={styles.adminSignOutText}>
-                Keluar
-              </ThemedText>
-            </Pressable>
+            <View style={styles.adminActionGroup}>
+              <Pressable
+                onPress={() => setAdminViewMode('mahasiswa_preview')}
+                style={styles.adminPreviewBtn}>
+                <ThemedText type="code" style={styles.adminPreviewText}>
+                  View Mahasiswa
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={handleSignOut}
+                disabled={isAuthLoading}
+                style={styles.adminSignOutBtn}>
+                <ThemedText type="code" style={styles.adminSignOutText}>
+                  Keluar
+                </ThemedText>
+              </Pressable>
+            </View>
           </View>
         </ThemedView>
 
@@ -1284,5 +1322,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#3c87f7',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  adminActionGroup: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  adminPreviewBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#E0E7FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  adminPreviewText: {
+    fontSize: 11,
+    color: '#3730A3',
+    fontWeight: '600',
+  },
+  previewModeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  previewModeText: {
+    color: '#94A3B8',
+    fontSize: 12,
+  },
+  previewModeBackBtn: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
 });

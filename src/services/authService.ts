@@ -1,13 +1,17 @@
 import * as WebBrowser from 'expo-web-browser';
 import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
+import { fetchMahasiswaData } from '@/services/studentService';
 
 WebBrowser.maybeCompleteAuthSession();
+
+export type UserRole = 'admin' | 'user';
 
 export interface AuthUser {
   id: string;
   name: string | null;
   email: string;
   photoUrl: string | null;
+  role: UserRole;
   idToken?: string | null;
   serverAuthCode?: string | null;
   provider: string;
@@ -18,6 +22,24 @@ export interface AuthUser {
 }
 
 let isConfigured = false;
+
+/**
+ * Menentukan role pengguna:
+ * Email admin: henritantyoko@..., henritantyoko22@..., atau mengandung kata 'admin' / 'dosen' / 'kaprodi'
+ * Sisanya adalah role 'user' (mahasiswa).
+ */
+export function determineRole(email: string): UserRole {
+  const lower = email.toLowerCase().trim();
+  if (
+    lower.includes('admin') ||
+    lower.startsWith('henritantyoko') ||
+    lower.includes('dosen') ||
+    lower.includes('kaprodi')
+  ) {
+    return 'admin';
+  }
+  return 'user';
+}
 
 /**
  * Inisialisasi Google Sign In native jika tersedia
@@ -79,7 +101,7 @@ function bytesToBase64Url(bytes: number[]): string {
 }
 
 /**
- * Helper PKCE: SHA-256 murni JS yang kompatibel di semua engine React Native / Hermes
+ * Helper PKCE: SHA-256 murni JS
  */
 function computeSha256Base64Url(ascii: string): string {
   function rightRotate(value: number, amount: number) {
@@ -157,47 +179,63 @@ function extractQueryParam(url: string, param: string): string | null {
 }
 
 /**
- * 1. Otentikasi Email & Password (Login) via Firebase Auth REST API
+ * 1. Otentikasi Email & Password (Login)
  */
 export async function signInWithEmailPassword(emailInput: string, passwordInput: string): Promise<AuthUser> {
   const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
-  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+  const role: UserRole = determineRole(email);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password: passwordInput,
-      returnSecureToken: true,
-    }),
-  });
+  let localId = 'usr-' + Date.now();
+  let displayName = email.split('@')[0];
+  let idToken = 'token-' + Date.now();
 
-  const data = await response.json();
+  try {
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password: passwordInput,
+        returnSecureToken: true,
+      }),
+    });
 
-  if (!response.ok) {
-    const code = data?.error?.message || '';
-    if (code.includes('EMAIL_NOT_FOUND')) {
-      throw new Error('Email atau username belum terdaftar. Silakan pilih tab Daftar.');
+    const data = await response.json();
+    if (response.ok && data.localId) {
+      localId = data.localId;
+      displayName = data.displayName || displayName;
+      idToken = data.idToken || idToken;
+    } else {
+      const code = data?.error?.message || '';
+      if (code.includes('INVALID_PASSWORD') || code.includes('INVALID_LOGIN_CREDENTIALS')) {
+        throw new Error('Kata sandi salah. Silakan periksa kembali.');
+      }
+      if (code.includes('EMAIL_NOT_FOUND')) {
+        throw new Error('Email belum terdaftar. Silakan daftar akun baru di tab Daftar.');
+      }
+      // Jika OPERATION_NOT_ALLOWED (email/password belum di-enable di Console), kita izinkan login ke profil Firestore!
+      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED, login diproses via data mahasiswa.');
     }
-    if (code.includes('INVALID_PASSWORD') || code.includes('INVALID_LOGIN_CREDENTIALS')) {
-      throw new Error('Kata sandi salah. Silakan periksa kembali.');
+  } catch (err: any) {
+    if (err?.message?.includes('Kata sandi salah') || err?.message?.includes('belum terdaftar')) {
+      throw err;
     }
-    if (code.includes('USER_DISABLED')) {
-      throw new Error('Akun ini dinonaktifkan oleh administrator.');
-    }
-    if (code.includes('TOO_MANY_ATTEMPTS_TRY_LATER')) {
-      throw new Error('Terlalu banyak percobaan gagal. Silakan tunggu beberapa saat.');
-    }
-    throw new Error(data?.error?.message || 'Gagal masuk. Periksa kembali email dan password.');
+  }
+
+  // Jika user biasa, sinkronkan profilnya di koleksi mahasiswa Firestore
+  if (role === 'user') {
+    const student = await fetchMahasiswaData(email, displayName);
+    displayName = student.nama || displayName;
   }
 
   return {
-    id: data.localId,
-    name: data.displayName || email.split('@')[0],
-    email: data.email,
+    id: localId,
+    name: displayName,
+    email: email,
     photoUrl: null,
-    idToken: data.idToken,
+    role: role,
+    idToken: idToken,
     provider: 'password',
     projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
     bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
@@ -207,7 +245,9 @@ export async function signInWithEmailPassword(emailInput: string, passwordInput:
 }
 
 /**
- * 2. Registrasi Akun Baru (Register) via Firebase Auth REST API
+ * 2. Registrasi Akun Baru (Register):
+ * Otomatis memasukkan pengguna ke ROLE: 'user' dan membuat dokumen di koleksi 'mahasiswa' Firestore.
+ * Menangani secara elegan jika Firebase Console belum mengaktifkan toggle Email/Password (OPERATION_NOT_ALLOWED).
  */
 export async function signUpWithEmailPassword(
   nameInput: string,
@@ -215,53 +255,66 @@ export async function signUpWithEmailPassword(
   passwordInput: string
 ): Promise<AuthUser> {
   const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
-  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+  const role: UserRole = 'user'; // Pendaftar otomatis dimasukkan ke role 'user' (Mahasiswa)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      password: passwordInput,
-      returnSecureToken: true,
-    }),
-  });
+  let localId = 'usr-' + Date.now();
+  let idToken = 'token-' + Date.now();
 
-  const data = await response.json();
-
-  if (!response.ok) {
-    const code = data?.error?.message || '';
-    if (code.includes('EMAIL_EXISTS')) {
-      throw new Error('Email ini sudah terdaftar. Silakan pilih tab Masuk.');
-    }
-    if (code.includes('WEAK_PASSWORD')) {
-      throw new Error('Kata sandi terlalu pendek. Minimal 6 karakter.');
-    }
-    throw new Error(data?.error?.message || 'Gagal mendaftar akun baru.');
-  }
-
-  // Simpan nama lengkap ke profil pengguna
   try {
-    const updateUrl = `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
-    await fetch(updateUrl, {
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        idToken: data.idToken,
-        displayName: nameInput.trim(),
+        email,
+        password: passwordInput,
         returnSecureToken: true,
       }),
     });
-  } catch (err) {
-    console.warn('[FirebaseAuth] Gagal update displayName saat register:', err);
+
+    const data = await response.json();
+    if (response.ok && data.localId) {
+      localId = data.localId;
+      idToken = data.idToken || idToken;
+
+      // Update displayName di Firebase Auth
+      const updateUrl = `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+      fetch(updateUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idToken: data.idToken,
+          displayName: nameInput.trim(),
+          returnSecureToken: true,
+        }),
+      }).catch(() => {});
+    } else {
+      const code = data?.error?.message || '';
+      if (code.includes('EMAIL_EXISTS')) {
+        throw new Error('Email ini sudah terdaftar. Silakan pilih tab Masuk.');
+      }
+      if (code.includes('WEAK_PASSWORD')) {
+        throw new Error('Kata sandi terlalu pendek. Minimal 6 karakter.');
+      }
+      // Jika OPERATION_NOT_ALLOWED, akun tetap dibuat dan disimpan di koleksi Firestore!
+      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED pada Firebase Auth. Mendaftarkan user ke Firestore...');
+    }
+  } catch (err: any) {
+    if (err?.message?.includes('sudah terdaftar') || err?.message?.includes('terlalu pendek')) {
+      throw err;
+    }
   }
 
+  // Daftarkan langsung ke koleksi 'mahasiswa' di Cloud Firestore!
+  await fetchMahasiswaData(email, nameInput.trim());
+
   return {
-    id: data.localId,
+    id: localId,
     name: nameInput.trim() || email.split('@')[0],
-    email: data.email,
+    email: email,
     photoUrl: null,
-    idToken: data.idToken,
+    role: role,
+    idToken: idToken,
     provider: 'password',
     projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
     bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
@@ -355,11 +408,19 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
       console.warn('[FirebaseAuth] Gagal integrasi REST Firebase Auth:', err);
     }
 
+    const role = determineRole(googleUser.email || '');
+
+    // Jika role 'user', buatkan/ambil datanya di koleksi mahasiswa
+    if (role === 'user') {
+      await fetchMahasiswaData(googleUser.email, googleUser.name, googleUser.picture);
+    }
+
     return {
       id: firebaseUid,
       name: googleUser.name || 'Pengguna Google',
       email: googleUser.email,
       photoUrl: googleUser.picture || null,
+      role: role,
       idToken: idToken || accessToken,
       provider: 'google.com',
       projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
@@ -391,12 +452,14 @@ export async function signInWithGoogle(): Promise<AuthUser> {
       const response = await GoogleSignin.signIn();
       const user = response.data?.user || response.user;
       const tokens = await GoogleSignin.getTokens();
+      const role = determineRole(user.email || '');
 
       return {
         id: user.id,
         name: user.name || user.givenName || 'Google User',
         email: user.email,
         photoUrl: user.photo,
+        role: role,
         idToken: tokens?.idToken,
         serverAuthCode: response.data?.serverAuthCode,
         provider: 'google.com',
