@@ -21,6 +21,7 @@ interface AuthContextType {
   signIn: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
+  registerUser: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -89,6 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const registerUser = useCallback(async (name: string, email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      // Mendaftarkan user ke koleksi 'users' dan 'mahasiswa' Firestore TANPA auto-login langsung
+      await signUpWithEmailPassword(name, email, password);
+    } catch (err: any) {
+      setError(err?.message || 'Gagal mendaftarkan akun baru.');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const signUpWithEmail = useCallback(async (name: string, email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -129,6 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signInWithEmail,
         signUpWithEmail,
+        registerUser,
         signOut,
         clearError,
       }}>

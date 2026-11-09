@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
 import { fetchMahasiswaData } from '@/services/studentService';
+import { fetchUserFromFirestore, saveUserToFirestore } from '@/services/userService';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -183,7 +184,6 @@ function extractQueryParam(url: string, param: string): string | null {
  */
 export async function signInWithEmailPassword(emailInput: string, passwordInput: string): Promise<AuthUser> {
   const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
-  const role: UserRole = determineRole(email);
 
   let localId = 'usr-' + Date.now();
   let displayName = email.split('@')[0];
@@ -214,14 +214,18 @@ export async function signInWithEmailPassword(emailInput: string, passwordInput:
       if (code.includes('EMAIL_NOT_FOUND')) {
         throw new Error('Email belum terdaftar. Silakan daftar akun baru di tab Daftar.');
       }
-      // Jika OPERATION_NOT_ALLOWED (email/password belum di-enable di Console), kita izinkan login ke profil Firestore!
-      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED, login diproses via data mahasiswa.');
+      // Jika OPERATION_NOT_ALLOWED, diproses via Firestore
+      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED, login diproses via Firestore.');
     }
   } catch (err: any) {
     if (err?.message?.includes('Kata sandi salah') || err?.message?.includes('belum terdaftar')) {
       throw err;
     }
   }
+
+  // Ambil role dari koleksi 'users' di Cloud Firestore (User Management)
+  const userAccount = await fetchUserFromFirestore(email, displayName);
+  const role: UserRole = userAccount.role;
 
   // Jika user biasa, sinkronkan profilnya di koleksi mahasiswa Firestore
   if (role === 'user') {
@@ -246,8 +250,8 @@ export async function signInWithEmailPassword(emailInput: string, passwordInput:
 
 /**
  * 2. Registrasi Akun Baru (Register):
- * Otomatis memasukkan pengguna ke ROLE: 'user' dan membuat dokumen di koleksi 'mahasiswa' Firestore.
- * Menangani secara elegan jika Firebase Console belum mengaktifkan toggle Email/Password (OPERATION_NOT_ALLOWED).
+ * Otomatis memasukkan pengguna ke koleksi 'users' (User Management) dengan role: 'user'
+ * dan membuat dokumen di koleksi 'mahasiswa' Firestore.
  */
 export async function signUpWithEmailPassword(
   nameInput: string,
@@ -255,7 +259,7 @@ export async function signUpWithEmailPassword(
   passwordInput: string
 ): Promise<AuthUser> {
   const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
-  const role: UserRole = 'user'; // Pendaftar otomatis dimasukkan ke role 'user' (Mahasiswa)
+  const role: UserRole = 'user'; // Pendaftar baru otomatis dimasukkan ke role 'user' (Mahasiswa)
 
   let localId = 'usr-' + Date.now();
   let idToken = 'token-' + Date.now();
@@ -296,8 +300,7 @@ export async function signUpWithEmailPassword(
       if (code.includes('WEAK_PASSWORD')) {
         throw new Error('Kata sandi terlalu pendek. Minimal 6 karakter.');
       }
-      // Jika OPERATION_NOT_ALLOWED, akun tetap dibuat dan disimpan di koleksi Firestore!
-      console.log('[FirebaseAuth] OPERATION_NOT_ALLOWED pada Firebase Auth. Mendaftarkan user ke Firestore...');
+      console.log('[FirebaseAuth] Registrasi diproses dan disimpan ke Firestore...');
     }
   } catch (err: any) {
     if (err?.message?.includes('sudah terdaftar') || err?.message?.includes('terlalu pendek')) {
@@ -305,7 +308,18 @@ export async function signUpWithEmailPassword(
     }
   }
 
-  // Daftarkan langsung ke koleksi 'mahasiswa' di Cloud Firestore!
+  // 1. Simpan ke koleksi 'users' di Cloud Firestore (User Management)
+  await saveUserToFirestore({
+    uid: localId,
+    nama: nameInput.trim(),
+    email: email,
+    role: 'user',
+    status: 'Aktif',
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+  });
+
+  // 2. Simpan ke koleksi 'mahasiswa' di Cloud Firestore
   await fetchMahasiswaData(email, nameInput.trim());
 
   return {
@@ -408,7 +422,8 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
       console.warn('[FirebaseAuth] Gagal integrasi REST Firebase Auth:', err);
     }
 
-    const role = determineRole(googleUser.email || '');
+    const userAccount = await fetchUserFromFirestore(googleUser.email, googleUser.name);
+    const role = userAccount.role;
 
     // Jika role 'user', buatkan/ambil datanya di koleksi mahasiswa
     if (role === 'user') {
@@ -452,7 +467,8 @@ export async function signInWithGoogle(): Promise<AuthUser> {
       const response = await GoogleSignin.signIn();
       const user = response.data?.user || response.user;
       const tokens = await GoogleSignin.getTokens();
-      const role = determineRole(user.email || '');
+      const userAccount = await fetchUserFromFirestore(user.email || '', user.name || user.givenName);
+      const role = userAccount.role;
 
       return {
         id: user.id,

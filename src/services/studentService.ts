@@ -79,7 +79,9 @@ function getAuthHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
   };
   const token = getAuthToken();
-  if (token) {
+  // Hanya sertakan Authorization header jika token adalah JWT valid (diawali "ey")
+  // Mengirim token placeholder/non-JWT akan memicu error 401 "Request had invalid authentication credentials"
+  if (token && token.startsWith('ey') && token.includes('.')) {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;

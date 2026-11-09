@@ -22,6 +22,7 @@ import {
   saveMahasiswaData,
   deleteMahasiswaData,
 } from '@/services/studentService';
+import { UserAccount, fetchAllUsers, updateUserRole } from '@/services/userService';
 import { MahasiswaHomeView } from '@/views/MahasiswaHomeView';
 
 export function HomeView() {
@@ -55,6 +56,10 @@ export function HomeView() {
       </View>
     );
   }
+
+  const [adminActiveTab, setAdminActiveTab] = useState<'skripsi' | 'users'>('skripsi');
+  const [usersList, setUsersList] = useState<UserAccount[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState<boolean>(false);
 
   const [mahasiswaList, setMahasiswaList] = useState<MahasiswaData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -100,13 +105,62 @@ export function HomeView() {
     }
   }, []);
 
+  const loadUsers = useCallback(async () => {
+    try {
+      setLoadingUsers(true);
+      const data = await fetchAllUsers();
+      setUsersList(data);
+    } catch (err) {
+      console.warn('Gagal memuat user management:', err);
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadData();
-  }, [loadData]);
+    loadUsers();
+  }, [loadData, loadUsers]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadData();
+    if (adminActiveTab === 'users') {
+      loadUsers().finally(() => setRefreshing(false));
+    } else {
+      loadData().finally(() => setRefreshing(false));
+    }
+  };
+
+  const handleToggleUserRole = (targetUser: UserAccount) => {
+    const newRole = targetUser.role === 'admin' ? 'user' : 'admin';
+    const roleLabel = newRole === 'admin' ? 'Administrator (Bisa melihat seluruh database mahasiswa)' : 'Mahasiswa (Hanya melihat data profil pribadi)';
+
+    Alert.alert(
+      'Ubah Hak Akses / Role',
+      `Ubah role "${targetUser.nama}" (${targetUser.email}) menjadi:\n\n👉 ${roleLabel}?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Ya, Ubah Role',
+          onPress: async () => {
+            try {
+              const success = await updateUserRole(targetUser.email, newRole);
+              if (success) {
+                Alert.alert(
+                  'Sukses',
+                  `Hak akses ${targetUser.email} berhasil diubah menjadi ${newRole.toUpperCase()} di koleksi Firestore 'users'.`
+                );
+                loadUsers();
+              } else {
+                Alert.alert('Error', 'Gagal memperbarui role di Firestore.');
+              }
+            } catch {
+              Alert.alert('Error', 'Terjadi kesalahan jaringan.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleOpenAdd = () => {
@@ -329,31 +383,219 @@ export function HomeView() {
           </View>
         </ThemedView>
 
-        {/* Section Judul & Tombol Tambah Mahasiswa (Full Width - Tidak Terpotong) */}
-        <View style={styles.headerSection}>
-          <View style={styles.titleInfo}>
-            <ThemedText type="subtitle" style={styles.pageTitle}>
-              Daftar Mahasiswa &amp; Skripsi
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              Database Cloud Firestore • Universitas Diponegoro ({mahasiswaList.length} Mahasiswa)
-            </ThemedText>
-          </View>
-
-          {/* Action Row: Tombol Tambah Mahasiswa */}
-          <View style={styles.actionButtonsContainer}>
-            <Pressable
-              onPress={handleOpenAdd}
-              style={({ pressed }) => [
-                styles.fullAddButton,
-                pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+        {/* Tab Switcher Admin: Skripsi vs User Management */}
+        <View style={styles.adminTabSelector}>
+          <Pressable
+            onPress={() => setAdminActiveTab('skripsi')}
+            style={[
+              styles.adminTabBtn,
+              adminActiveTab === 'skripsi' && styles.adminTabBtnActive,
+            ]}>
+            <ThemedText
+              type="smallBold"
+              style={[
+                styles.adminTabText,
+                adminActiveTab === 'skripsi' && styles.adminTabTextActive,
               ]}>
-              <ThemedText type="smallBold" style={styles.fullAddButtonText}>
-                + Tambah Mahasiswa Baru
-              </ThemedText>
-            </Pressable>
-          </View>
+              📋 Data Skripsi ({mahasiswaList.length})
+            </ThemedText>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              setAdminActiveTab('users');
+              loadUsers();
+            }}
+            style={[
+              styles.adminTabBtn,
+              adminActiveTab === 'users' && styles.adminTabBtnActive,
+            ]}>
+            <ThemedText
+              type="smallBold"
+              style={[
+                styles.adminTabText,
+                adminActiveTab === 'users' && styles.adminTabTextActive,
+              ]}>
+              👥 User Management ({usersList.length})
+            </ThemedText>
+          </Pressable>
         </View>
+
+        {adminActiveTab === 'users' ? (
+          <View style={styles.userMgmtContainer}>
+            <View style={styles.headerSection}>
+              <View style={styles.titleInfo}>
+                <ThemedText type="subtitle" style={styles.pageTitle}>
+                  Hak Akses &amp; User Management
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Koleksi Firestore &apos;users&apos; • Atur siapa yang bisa melihat semua data mahasiswa (Admin) atau hanya profil pribadi (Mahasiswa)
+                </ThemedText>
+              </View>
+
+              <Pressable
+                onPress={() => loadUsers()}
+                style={styles.refreshUsersBtn}>
+                <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
+                  🔄 Muat Ulang
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            {/* Metric User Management */}
+            <View style={styles.metricsRow}>
+              <ThemedView type="backgroundElement" style={styles.metricCard}>
+                <ThemedText type="code" themeColor="textSecondary">TOTAL USER</ThemedText>
+                <ThemedText type="subtitle" style={styles.metricNum}>{usersList.length}</ThemedText>
+                <ThemedText type="code" style={styles.metricSub}>Terdaftar</ThemedText>
+              </ThemedView>
+
+              <ThemedView type="backgroundElement" style={styles.metricCard}>
+                <ThemedText type="code" style={{ color: '#4338CA' }}>ADMIN</ThemedText>
+                <ThemedText type="subtitle" style={[styles.metricNum, { color: '#4338CA' }]}>
+                  {usersList.filter((u) => u.role === 'admin').length}
+                </ThemedText>
+                <ThemedText type="code" style={styles.metricSub}>Akses Penuh</ThemedText>
+              </ThemedView>
+
+              <ThemedView type="backgroundElement" style={styles.metricCard}>
+                <ThemedText type="code" style={{ color: '#0284C7' }}>MAHASISWA</ThemedText>
+                <ThemedText type="subtitle" style={[styles.metricNum, { color: '#0284C7' }]}>
+                  {usersList.filter((u) => u.role === 'user').length}
+                </ThemedText>
+                <ThemedText type="code" style={styles.metricSub}>Akses Personal</ThemedText>
+              </ThemedView>
+            </View>
+
+            {/* Info Box */}
+            <View style={styles.userMgmtInfoBox}>
+              <ThemedText type="smallBold" style={{ color: '#1E40AF', marginBottom: 2 }}>
+                ℹ️ Penjelasan Hak Akses Pengguna:
+              </ThemedText>
+              <ThemedText type="code" style={{ color: '#1E3A8A', lineHeight: 18 }}>
+                • <ThemedText type="code" style={{ fontWeight: '700' }}>ADMIN</ThemedText>: Memiliki izin penuh melihat tabel seluruh mahasiswa, rekapitulasi dosen, menambah, mengedit, dan menghapus skripsi.{'\n'}
+                • <ThemedText type="code" style={{ fontWeight: '700' }}>MAHASISWA</ThemedText>: Hanya melihat KTM digital &amp; data skripsi pribadinya di koleksi &apos;mahasiswa&apos;.
+              </ThemedText>
+            </View>
+
+            {/* User List */}
+            {loadingUsers ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="small" color="#3c87f7" />
+                <ThemedText type="small" style={{ marginTop: 8 }}>Memuat akun dari koleksi &apos;users&apos;...</ThemedText>
+              </View>
+            ) : usersList.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <ThemedText type="subtitle" style={styles.emptyTitle}>Belum Ada Pengguna di Koleksi &apos;users&apos;</ThemedText>
+                <ThemedText type="small" style={styles.emptySubtitle}>
+                  Setiap akun yang mendaftar atau login otomatis tersimpan di koleksi &apos;users&apos; Firestore.
+                </ThemedText>
+                <Pressable onPress={() => loadUsers()} style={styles.retryBtn}>
+                  <ThemedText type="smallBold" style={{ color: '#FFFFFF' }}>Muat Ulang Data</ThemedText>
+                </Pressable>
+              </View>
+            ) : (
+              <View style={styles.userListContainer}>
+                {usersList.map((usr, idx) => (
+                  <View key={usr.email || idx} style={styles.userCard}>
+                    <View style={styles.userCardHeader}>
+                      <View
+                        style={[
+                          styles.userAvatarBox,
+                          usr.role === 'admin' ? styles.userAvatarBoxAdmin : styles.userAvatarBoxStudent,
+                        ]}>
+                        <ThemedText type="smallBold" style={{ color: '#FFFFFF', fontSize: 16 }}>
+                          {usr.nama ? usr.nama.charAt(0).toUpperCase() : 'U'}
+                        </ThemedText>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.userNameRow}>
+                          <ThemedText type="smallBold" style={styles.userNameText}>
+                            {usr.nama || 'Pengguna'}
+                          </ThemedText>
+                          <View
+                            style={[
+                              styles.userRoleBadge,
+                              usr.role === 'admin' ? styles.userRoleBadgeAdmin : styles.userRoleBadgeStudent,
+                            ]}>
+                            <ThemedText
+                              type="code"
+                              style={[
+                                styles.userRoleBadgeText,
+                                usr.role === 'admin' ? styles.userRoleBadgeTextAdmin : styles.userRoleBadgeTextStudent,
+                              ]}>
+                              {usr.role === 'admin' ? '🛡️ ADMIN' : '🎓 MAHASISWA'}
+                            </ThemedText>
+                          </View>
+                        </View>
+                        <ThemedText type="code" style={styles.userEmailText}>
+                          {usr.email}
+                        </ThemedText>
+                        <ThemedText type="code" style={styles.userAccessDesc}>
+                          {usr.role === 'admin'
+                            ? 'Dapat melihat seluruh database mahasiswa & skripsi'
+                            : 'Hanya dapat melihat profil & skripsi pribadinya'}
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    <View style={styles.userCardFooter}>
+                      <View style={styles.userStatusPill}>
+                        <View style={styles.userStatusDot} />
+                        <ThemedText type="code" style={styles.userStatusText}>
+                          Status: {usr.status || 'Aktif'}
+                        </ThemedText>
+                      </View>
+
+                      <Pressable
+                        onPress={() => handleToggleUserRole(usr)}
+                        style={({ pressed }) => [
+                          styles.userRoleChangeBtn,
+                          usr.role === 'admin' ? styles.demoteBtn : styles.promoteBtn,
+                          pressed && { opacity: 0.8 },
+                        ]}>
+                        <ThemedText
+                          type="code"
+                          style={[
+                            styles.userRoleChangeText,
+                            usr.role === 'admin' ? styles.demoteText : styles.promoteText,
+                          ]}>
+                          {usr.role === 'admin' ? 'Ubah ke Mahasiswa' : 'Jadikan Admin'}
+                        </ThemedText>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          <>
+            {/* Section Judul & Tombol Tambah Mahasiswa (Full Width - Tidak Terpotong) */}
+            <View style={styles.headerSection}>
+              <View style={styles.titleInfo}>
+                <ThemedText type="subtitle" style={styles.pageTitle}>
+                  Daftar Mahasiswa &amp; Skripsi
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  Database Cloud Firestore • Universitas Diponegoro ({mahasiswaList.length} Mahasiswa)
+                </ThemedText>
+              </View>
+
+              {/* Action Row: Tombol Tambah Mahasiswa */}
+              <View style={styles.actionButtonsContainer}>
+                <Pressable
+                  onPress={handleOpenAdd}
+                  style={({ pressed }) => [
+                    styles.fullAddButton,
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+                  ]}>
+                  <ThemedText type="smallBold" style={styles.fullAddButtonText}>
+                    + Tambah Mahasiswa Baru
+                  </ThemedText>
+                </Pressable>
+              </View>
+            </View>
 
         {/* Metric Cards Row */}
         <View style={styles.metricsRow}>
@@ -554,6 +796,8 @@ export function HomeView() {
               );
             })}
           </View>
+        )}
+          </>
         )}
       </View>
 
@@ -1358,5 +1602,204 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 6,
+  },
+  adminTabSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    backgroundColor: '#F1F5F9',
+    padding: 4,
+    borderRadius: 12,
+  },
+  adminTabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminTabBtnActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  adminTabText: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  adminTabTextActive: {
+    color: '#1E293B',
+    fontWeight: '700',
+  },
+  userMgmtContainer: {
+    gap: 14,
+  },
+  loadingBox: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    color: '#0F172A',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryBtn: {
+    backgroundColor: '#3c87f7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  refreshUsersBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignSelf: 'flex-start',
+  },
+  userMgmtInfoBox: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    padding: 12,
+  },
+  userListContainer: {
+    gap: 12,
+  },
+  userCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
+    gap: 12,
+  },
+  userCardHeader: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+  },
+  userAvatarBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatarBoxAdmin: {
+    backgroundColor: '#4338CA',
+  },
+  userAvatarBoxStudent: {
+    backgroundColor: '#0284C7',
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  userNameText: {
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  userRoleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  userRoleBadgeAdmin: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  userRoleBadgeStudent: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  userRoleBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  userRoleBadgeTextAdmin: {
+    color: '#4338CA',
+  },
+  userRoleBadgeTextStudent: {
+    color: '#0369A1',
+  },
+  userEmailText: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  userAccessDesc: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 4,
+  },
+  userCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  userStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  userStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  userStatusText: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  userRoleChangeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  promoteBtn: {
+    backgroundColor: '#EEF2FF',
+    borderColor: '#C7D2FE',
+  },
+  demoteBtn: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  userRoleChangeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  promoteText: {
+    color: '#4338CA',
+  },
+  demoteText: {
+    color: '#DC2626',
   },
 });

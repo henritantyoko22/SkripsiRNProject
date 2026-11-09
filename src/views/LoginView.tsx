@@ -6,6 +6,7 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
@@ -13,7 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
 
 export function LoginView() {
-  const { signIn, signInWithEmail, signUpWithEmail, isLoading, error, clearError } = useAuth();
+  const { signIn, signInWithEmail, registerUser, isLoading, error, clearError } = useAuth();
 
   // Mode tab: 'login' atau 'register'
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
@@ -75,7 +76,23 @@ export function LoginView() {
     }
 
     try {
-      await signUpWithEmail(registerName, registerEmail, registerPassword);
+      await registerUser(registerName, registerEmail, registerPassword);
+      Alert.alert(
+        'Pendaftaran Berhasil',
+        `Akun ${registerEmail.trim()} berhasil didaftarkan di database Cloud Firestore!\n\nSilakan masuk menggunakan email/username dan kata sandi Anda.`,
+        [
+          {
+            text: 'Masuk Sekarang',
+            onPress: () => {
+              setLoginEmail(registerEmail.trim());
+              setLoginPassword('');
+              setActiveTab('login');
+              setRegisterPassword('');
+              setRegisterConfirmPassword('');
+            },
+          },
+        ]
+      );
     } catch {
       // Error disimpan di AuthContext
     }
