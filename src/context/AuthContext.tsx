@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import {
   AuthUser,
-  GoogleAccountOption,
   signInWithGoogle,
-  signInWithSelectedAccount,
+  signInWithEmailPassword,
+  signUpWithEmailPassword,
   signOutGoogle,
 } from '@/services/authService';
 
@@ -12,7 +12,8 @@ interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   signIn: () => Promise<void>;
-  signInWithAccount: (account: GoogleAccountOption) => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   clearError: () => void;
 }
@@ -42,15 +43,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signInWithAccount = useCallback(async (account: GoogleAccountOption) => {
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
     try {
       setIsLoading(true);
       setError(null);
-      const authenticatedUser = await signInWithSelectedAccount(account);
+      const authenticatedUser = await signInWithEmailPassword(email, password);
       setUser(authenticatedUser);
     } catch (err: any) {
-      const errorMessage = err?.message || 'Gagal masuk dengan akun yang dipilih.';
-      setError(errorMessage);
+      setError(err?.message || 'Gagal masuk. Periksa kembali email dan password Anda.');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const signUpWithEmail = useCallback(async (name: string, email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const authenticatedUser = await signUpWithEmailPassword(name, email, password);
+      setUser(authenticatedUser);
+    } catch (err: any) {
+      setError(err?.message || 'Gagal mendaftarkan akun baru.');
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         signIn,
-        signInWithAccount,
+        signInWithEmail,
+        signUpWithEmail,
         signOut,
         clearError,
       }}>

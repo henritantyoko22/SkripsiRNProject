@@ -22,25 +22,22 @@ export function GoogleSignInButton({
   disabled = false,
   title = 'Sign in with Google',
 }: GoogleSignInButtonProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || isLoading}
       style={({ pressed }) => [
         styles.button,
-        isDark ? styles.buttonDark : styles.buttonLight,
+        styles.buttonLight,
         pressed && styles.buttonPressed,
         (disabled || isLoading) && styles.buttonDisabled,
       ]}>
       {isLoading ? (
-        <ActivityIndicator color={isDark ? '#FFFFFF' : '#1F1F1F'} size="small" />
+        <ActivityIndicator color="#1F1F1F" size="small" />
       ) : (
         <View style={styles.content}>
           <GoogleLogo size={20} />
-          <Text style={[styles.text, isDark ? styles.textDark : styles.textLight]}>
+          <Text style={[styles.text, styles.textLight]}>
             {title}
           </Text>
         </View>
@@ -51,30 +48,30 @@ export function GoogleSignInButton({
 
 const styles = StyleSheet.create({
   button: {
-    height: 48,
-    borderRadius: 24,
+    height: 46,
+    borderRadius: 12,
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
     width: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 2,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   buttonLight: {
     backgroundColor: '#FFFFFF',
     borderColor: '#DADCE0',
   },
   buttonDark: {
-    backgroundColor: '#131314',
-    borderColor: '#8E918F',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#DADCE0',
   },
   buttonPressed: {
-    opacity: 0.82,
+    opacity: 0.85,
     transform: [{ scale: 0.99 }],
   },
   buttonDisabled: {
@@ -87,14 +84,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   text: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
     letterSpacing: 0.2,
   },
   textLight: {
-    color: '#1F1F1F',
+    color: '#3C4043',
   },
   textDark: {
-    color: '#E3E3E3',
+    color: '#3C4043',
   },
 });

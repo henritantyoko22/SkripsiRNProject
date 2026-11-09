@@ -4,378 +4,373 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Modal,
   TextInput,
   ActivityIndicator,
-  useColorScheme,
 } from 'react-native';
-import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
 import { GoogleSignInButton } from '@/components/GoogleSignInButton';
-import { GoogleLogo } from '@/components/GoogleLogo';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Spacing, MaxContentWidth } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import {
-  PRESET_GOOGLE_ACCOUNTS,
-  GoogleAccountOption,
-} from '@/services/authService';
 
 export function LoginView() {
-  const { signIn, signInWithAccount, isLoading, error, clearError } = useAuth();
-  const theme = useTheme();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { signIn, signInWithEmail, signUpWithEmail, isLoading, error, clearError } = useAuth();
 
-  const [isChooserOpen, setIsChooserOpen] = useState<boolean>(false);
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  // Mode tab: 'login' atau 'register'
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
 
-  const handleRealGoogleLogin = async () => {
-    try {
-      await signIn();
-    } catch (e) {
-      // Error is stored in AuthContext
-    }
+  // State Login
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+
+  // State Register
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const handleTabChange = (tab: 'login' | 'register') => {
+    setActiveTab(tab);
+    clearError();
+    setValidationError(null);
   };
 
-  // Form akun lain / custom
-  const [isCustomOpen, setIsCustomOpen] = useState<boolean>(false);
-  const [customName, setCustomName] = useState<string>('');
-  const [customEmail, setCustomEmail] = useState<string>('');
+  const handleLoginSubmit = async () => {
+    setValidationError(null);
+    clearError();
 
-  const handleSelectAccount = async (account: GoogleAccountOption) => {
-    setSelectedAccountId(account.id);
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setValidationError('Silakan isi email/username dan kata sandi Anda.');
+      return;
+    }
+
     try {
-      await signInWithAccount(account);
-      setIsChooserOpen(false);
+      await signInWithEmail(loginEmail, loginPassword);
     } catch {
-      // Error handled by AuthContext
-    } finally {
-      setSelectedAccountId(null);
+      // Error disimpan di AuthContext
     }
   };
 
-  const handleCustomLogin = async () => {
-    if (!customEmail.trim() || !customName.trim()) return;
+  const handleRegisterSubmit = async () => {
+    setValidationError(null);
+    clearError();
 
-    const customAccount: GoogleAccountOption = {
-      id: 'google-custom-' + Date.now(),
-      name: customName.trim(),
-      email: customEmail.trim(),
-      photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-      role: 'Administrator Skripsi',
-    };
+    if (!registerName.trim()) {
+      setValidationError('Silakan masukkan nama lengkap Anda.');
+      return;
+    }
+    if (!registerEmail.trim()) {
+      setValidationError('Silakan masukkan alamat email atau username.');
+      return;
+    }
+    if (registerPassword.length < 6) {
+      setValidationError('Kata sandi minimal 6 karakter.');
+      return;
+    }
+    if (registerPassword !== registerConfirmPassword) {
+      setValidationError('Konfirmasi kata sandi tidak cocok.');
+      return;
+    }
 
-    await handleSelectAccount(customAccount);
+    try {
+      await signUpWithEmail(registerName, registerEmail, registerPassword);
+    } catch {
+      // Error disimpan di AuthContext
+    }
   };
+
+  const displayError = validationError || error;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}>
-      <View style={styles.container}>
-        {/* Header Hero */}
-        <View style={styles.header}>
-          <View style={[styles.badge, { backgroundColor: theme.backgroundElement }]}>
-            <ThemedText type="code" style={styles.badgeText}>
-              UNIVERSITAS DIPONEGORO
-            </ThemedText>
-          </View>
-          <ThemedText type="subtitle" style={styles.title}>
-            Portal Admin Skripsi
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.subtitle}>
-            Sistem Informasi &amp; Database Skripsi Mahasiswa
-          </ThemedText>
-        </View>
-
-        {/* Error notification banner */}
-        {error && (
-          <View style={styles.errorBanner}>
-            <ThemedText type="small" style={styles.errorText}>
-              {error}
-            </ThemedText>
-            <Pressable onPress={clearError} style={styles.errorClose}>
-              <ThemedText type="smallBold" style={styles.errorCloseText}>
-                ✕
+    <View style={styles.outerScreen}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          {/* Header Universitas (Light Mode) */}
+          <View style={styles.header}>
+            <View style={styles.badge}>
+              <ThemedText type="code" style={styles.badgeText}>
+                UNIVERSITAS DIPONEGORO
               </ThemedText>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Main Action Card */}
-        <ThemedView type="backgroundElement" style={styles.actionCard}>
-          <ThemedText type="smallBold" style={styles.actionTitle}>
-            Masuk sebagai Administrator
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.actionDesc}>
-            Masuk menggunakan akun Google Anda untuk mengakses dan mengelola database mahasiswa yang mengambil skripsi.
-          </ThemedText>
-
-          <View style={styles.buttonWrapper}>
-            <GoogleSignInButton
-              title="Masuk dengan Google (Akun Asli)"
-              onPress={handleRealGoogleLogin}
-              isLoading={isLoading}
-            />
-
-            <Pressable
-              onPress={() => setIsChooserOpen(true)}
-              style={styles.chooseAccountAltBtn}>
-              <ThemedText type="code" style={styles.chooseAccountAltText}>
-                Atau pilih akun preset / uji coba cepat ›
-              </ThemedText>
-            </Pressable>
-          </View>
-
-          <View style={styles.infoBox}>
-            <ThemedText type="code" style={styles.infoBoxText}>
-              🌐 Terhubung langsung ke Google OAuth 2.0 &amp; Firebase Authentication
-            </ThemedText>
-          </View>
-        </ThemedView>
-
-        {/* Petunjuk Login Mahasiswa */}
-        <ThemedView type="backgroundElement" style={styles.guideCard}>
-          <ThemedText type="smallBold" style={styles.guideTitle}>
-            Pilihan Akun yang Tersedia
-          </ThemedText>
-          <View style={styles.guideRow}>
-            <ThemedText type="smallBold" style={styles.guideBullet}>
-              1.
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
-              Pilih akun Google Anda (Koordinator Skripsi, Kaprodi, atau Akun Dosen/Admin).
-            </ThemedText>
-          </View>
-          <View style={styles.guideRow}>
-            <ThemedText type="smallBold" style={styles.guideBullet}>
-              2.
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.guideText}>
-              Atau gunakan opsi &ldquo;Gunakan akun lain&rdquo; untuk login dengan akun Google custom Anda.
-            </ThemedText>
-          </View>
-        </ThemedView>
-      </View>
-
-      {/* MODAL: Google Account Chooser (Pilih Akun Google) */}
-      <Modal
-        visible={isChooserOpen}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setIsChooserOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.accountChooserCard,
-              { backgroundColor: isDark ? '#1E1E20' : '#FFFFFF' },
-            ]}>
-            {/* Header Chooser */}
-            <View style={styles.chooserHeader}>
-              <View style={styles.chooserTitleRow}>
-                <GoogleLogo size={24} />
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <ThemedText type="smallBold" style={styles.chooserMainTitle}>
-                    Pilih akun
-                  </ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.chooserSubtitle}>
-                    untuk melanjutkan ke Skripsi App UNDIP
-                  </ThemedText>
-                </View>
-                <Pressable onPress={() => setIsChooserOpen(false)} style={styles.chooserCloseBtn}>
-                  <ThemedText type="smallBold">✕</ThemedText>
-                </Pressable>
-              </View>
             </View>
+            <ThemedText type="subtitle" style={styles.title}>
+              Portal Skripsi
+            </ThemedText>
+            <ThemedText type="small" style={styles.subtitle}>
+              Sistem Informasi &amp; Pengelolaan Tugas Akhir Mahasiswa
+            </ThemedText>
+          </View>
 
-            <View style={styles.accountDivider} />
-
-            {/* List Pilihan Akun Google */}
-            <ScrollView style={styles.accountListScroll} showsVerticalScrollIndicator={false}>
-              {PRESET_GOOGLE_ACCOUNTS.map((acc) => {
-                const isThisLoading = selectedAccountId === acc.id;
-                return (
-                  <Pressable
-                    key={acc.id}
-                    onPress={() => handleSelectAccount(acc)}
-                    disabled={isLoading}
-                    style={({ pressed }) => [
-                      styles.accountItem,
-                      pressed && styles.accountItemPressed,
-                    ]}>
-                    <View style={styles.accountAvatarWrapper}>
-                      <Image
-                        source={{ uri: acc.photoUrl }}
-                        style={styles.accountAvatar}
-                        contentFit="cover"
-                      />
-                    </View>
-
-                    <View style={styles.accountDetails}>
-                      <ThemedText type="smallBold" style={styles.accountName}>
-                        {acc.name}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary" style={styles.accountEmail}>
-                        {acc.email}
-                      </ThemedText>
-                      <View style={styles.roleBadge}>
-                        <ThemedText type="code" style={styles.roleBadgeText}>
-                          {acc.role}
-                        </ThemedText>
-                      </View>
-                    </View>
-
-                    {isThisLoading ? (
-                      <ActivityIndicator size="small" color="#3c87f7" />
-                    ) : (
-                      <ThemedText type="small" themeColor="textSecondary">
-                        ›
-                      </ThemedText>
-                    )}
-                  </Pressable>
-                );
-              })}
-
-              <View style={styles.accountDivider} />
-
-              {/* Pilihan: Gunakan Akun Lain */}
+          {/* Notifikasi Error jika ada */}
+          {displayError && (
+            <View style={styles.errorBanner}>
+              <ThemedText type="small" style={styles.errorText}>
+                {displayError}
+              </ThemedText>
               <Pressable
-                onPress={() => setIsCustomOpen(!isCustomOpen)}
-                style={({ pressed }) => [
-                  styles.useAnotherAccountItem,
-                  pressed && styles.accountItemPressed,
-                ]}>
-                <View style={styles.addAccountIconCircle}>
-                  <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
-                    +
-                  </ThemedText>
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
-                    Gunakan akun Google lain
-                  </ThemedText>
-                  <ThemedText type="code" themeColor="textSecondary">
-                    Ketik nama dan email akun Anda sendiri
-                  </ThemedText>
-                </View>
-                <ThemedText type="smallBold" style={{ color: '#3c87f7' }}>
-                  {isCustomOpen ? '▲' : '▼'}
+                onPress={() => {
+                  setValidationError(null);
+                  clearError();
+                }}
+                style={styles.errorClose}>
+                <ThemedText type="smallBold" style={styles.errorCloseText}>
+                  ✕
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+
+          {/* Kartu Autentikasi Utama (Clean White Light Mode) */}
+          <View style={styles.authCard}>
+            {/* Tab Switcher: Masuk vs Daftar */}
+            <View style={styles.tabSwitcher}>
+              <Pressable
+                onPress={() => handleTabChange('login')}
+                style={[styles.tabButton, activeTab === 'login' && styles.tabButtonActive]}>
+                <ThemedText
+                  type="smallBold"
+                  style={[styles.tabText, activeTab === 'login' && styles.tabTextActive]}>
+                  Masuk (Login)
                 </ThemedText>
               </Pressable>
 
-              {/* Form Input Akun Lain */}
-              {isCustomOpen && (
-                <View style={styles.customAccountForm}>
-                  <ThemedText type="code" themeColor="textSecondary">
-                    NAMA LENGKAP
-                  </ThemedText>
-                  <TextInput
-                    value={customName}
-                    onChangeText={setCustomName}
-                    placeholder="Contoh: Henri Tantyoko"
-                    placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
-                    style={[
-                      styles.customInput,
-                      {
-                        color: isDark ? '#FFF' : '#111',
-                        backgroundColor: isDark ? '#27272A' : '#F9FAFB',
-                        borderColor: isDark ? '#3F3F46' : '#D1D5DB',
-                      },
-                    ]}
-                  />
+              <Pressable
+                onPress={() => handleTabChange('register')}
+                style={[styles.tabButton, activeTab === 'register' && styles.tabButtonActive]}>
+                <ThemedText
+                  type="smallBold"
+                  style={[styles.tabText, activeTab === 'register' && styles.tabTextActive]}>
+                  Daftar (Register)
+                </ThemedText>
+              </Pressable>
+            </View>
 
-                  <ThemedText type="code" themeColor="textSecondary" style={{ marginTop: 8 }}>
-                    EMAIL GOOGLE
+            {/* FORM 1: MASUK (LOGIN) */}
+            {activeTab === 'login' && (
+              <View style={styles.formContainer}>
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Email atau Username
                   </ThemedText>
                   <TextInput
-                    value={customEmail}
-                    onChangeText={setCustomEmail}
-                    placeholder="nama.anda@gmail.com / @undip.ac.id"
-                    placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                    value={loginEmail}
+                    onChangeText={setLoginEmail}
+                    placeholder="nama@undip.ac.id atau username"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    style={styles.textInput}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Kata Sandi
+                  </ThemedText>
+                  <View style={styles.passwordWrapper}>
+                    <TextInput
+                      value={loginPassword}
+                      onChangeText={setLoginPassword}
+                      placeholder="Masukkan kata sandi"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry={!showLoginPassword}
+                      autoCapitalize="none"
+                      style={styles.passwordInput}
+                    />
+                    <Pressable
+                      onPress={() => setShowLoginPassword(!showLoginPassword)}
+                      style={styles.eyeBtn}>
+                      <ThemedText type="code" style={styles.eyeBtnText}>
+                        {showLoginPassword ? 'Sembunyi' : 'Lihat'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <Pressable
+                  onPress={handleLoginSubmit}
+                  disabled={isLoading}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                      Masuk ke Akun
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            )}
+
+            {/* FORM 2: DAFTAR (REGISTER) */}
+            {activeTab === 'register' && (
+              <View style={styles.formContainer}>
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Nama Lengkap
+                  </ThemedText>
+                  <TextInput
+                    value={registerName}
+                    onChangeText={setRegisterName}
+                    placeholder="Contoh: Henri Tantyoko"
+                    placeholderTextColor="#94A3B8"
+                    style={styles.textInput}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Alamat Email
+                  </ThemedText>
+                  <TextInput
+                    value={registerEmail}
+                    onChangeText={setRegisterEmail}
+                    placeholder="email@students.undip.ac.id"
+                    placeholderTextColor="#94A3B8"
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    style={[
-                      styles.customInput,
-                      {
-                        color: isDark ? '#FFF' : '#111',
-                        backgroundColor: isDark ? '#27272A' : '#F9FAFB',
-                        borderColor: isDark ? '#3F3F46' : '#D1D5DB',
-                      },
-                    ]}
+                    style={styles.textInput}
                   />
-
-                  <Pressable
-                    onPress={handleCustomLogin}
-                    disabled={isLoading || !customName.trim() || !customEmail.trim()}
-                    style={[
-                      styles.customLoginBtn,
-                      (!customName.trim() || !customEmail.trim()) && { opacity: 0.5 },
-                    ]}>
-                    <ThemedText type="smallBold" style={{ color: '#FFF' }}>
-                      Lanjutkan Masuk dengan Akun Ini
-                    </ThemedText>
-                  </Pressable>
                 </View>
-              )}
-            </ScrollView>
 
-            <View style={styles.accountDivider} />
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Kata Sandi Baru
+                  </ThemedText>
+                  <View style={styles.passwordWrapper}>
+                    <TextInput
+                      value={registerPassword}
+                      onChangeText={setRegisterPassword}
+                      placeholder="Minimal 6 karakter"
+                      placeholderTextColor="#94A3B8"
+                      secureTextEntry={!showRegisterPassword}
+                      autoCapitalize="none"
+                      style={styles.passwordInput}
+                    />
+                    <Pressable
+                      onPress={() => setShowRegisterPassword(!showRegisterPassword)}
+                      style={styles.eyeBtn}>
+                      <ThemedText type="code" style={styles.eyeBtnText}>
+                        {showRegisterPassword ? 'Sembunyi' : 'Lihat'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
 
-            {/* Footer Kebijakan Google */}
-            <View style={styles.chooserFooter}>
-              <ThemedText type="code" themeColor="textSecondary" style={styles.footerNote}>
-                Untuk melanjutkan, Google akan membagikan nama, alamat email, dan preferensi akun Anda kepada Skripsi App UNDIP.
+                <View style={styles.inputGroup}>
+                  <ThemedText type="smallBold" style={styles.label}>
+                    Konfirmasi Kata Sandi
+                  </ThemedText>
+                  <TextInput
+                    value={registerConfirmPassword}
+                    onChangeText={setRegisterConfirmPassword}
+                    placeholder="Ketik ulang kata sandi"
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry={!showRegisterPassword}
+                    autoCapitalize="none"
+                    style={styles.textInput}
+                  />
+                </View>
+
+                <Pressable
+                  onPress={handleRegisterSubmit}
+                  disabled={isLoading}
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.buttonPressed,
+                  ]}>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <ThemedText type="smallBold" style={styles.primaryButtonText}>
+                      Daftar Akun Baru
+                    </ThemedText>
+                  )}
+                </Pressable>
+              </View>
+            )}
+
+            {/* Separator / Pembatas Opsi */}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <ThemedText type="code" style={styles.dividerText}>
+                atau
               </ThemedText>
+              <View style={styles.dividerLine} />
+            </View>
+
+            {/* Tombol Google Sign In */}
+            <View style={styles.googleButtonWrapper}>
+              <GoogleSignInButton
+                title={activeTab === 'login' ? 'Masuk dengan Google' : 'Daftar dengan Google'}
+                onPress={signIn}
+                isLoading={isLoading}
+              />
             </View>
           </View>
         </View>
-      </Modal>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  outerScreen: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
+    paddingVertical: Spacing.five,
   },
   container: {
     width: '100%',
-    maxWidth: MaxContentWidth,
+    maxWidth: 440,
     alignSelf: 'center',
-    gap: Spacing.four,
+    gap: Spacing.three,
   },
   header: {
     alignItems: 'center',
-    gap: Spacing.two,
+    gap: Spacing.one,
   },
   badge: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: Spacing.one,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 4,
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
+    color: '#1D4ED8',
     letterSpacing: 0.8,
   },
   title: {
+    fontSize: 26,
+    fontWeight: '800',
     textAlign: 'center',
-    fontWeight: '700',
+    color: '#0F172A',
   },
   subtitle: {
+    fontSize: 13,
     textAlign: 'center',
-    maxWidth: 340,
-    lineHeight: 20,
+    color: '#64748B',
+    lineHeight: 18,
+    maxWidth: 320,
   },
   errorBanner: {
-    backgroundColor: '#FDE8E8',
-    borderColor: '#F98080',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#F87171',
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
@@ -384,7 +379,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   errorText: {
-    color: '#9B1C1C',
+    color: '#991B1B',
+    fontSize: 13,
     flex: 1,
   },
   errorClose: {
@@ -392,204 +388,137 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   errorCloseText: {
-    color: '#9B1C1C',
+    color: '#991B1B',
+    fontSize: 14,
   },
-  actionCard: {
-    padding: Spacing.five,
+  authCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    gap: Spacing.two,
+    padding: Spacing.four,
+    gap: Spacing.three,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  tabSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  actionTitle: {
-    fontSize: 18,
-    textAlign: 'center',
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  actionDesc: {
-    textAlign: 'center',
-    marginBottom: Spacing.three,
-    lineHeight: 20,
-  },
-  buttonWrapper: {
-    width: '100%',
-    maxWidth: 320,
-    gap: 8,
-  },
-  chooseAccountAltBtn: {
-    paddingVertical: 6,
-    alignItems: 'center',
-  },
-  chooseAccountAltText: {
-    fontSize: 11,
-    color: '#3c87f7',
+  tabText: {
+    fontSize: 13,
+    color: '#64748B',
     fontWeight: '600',
   },
-  infoBox: {
-    marginTop: Spacing.two,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#8E918F15',
+  tabTextActive: {
+    color: '#1D4ED8',
+    fontWeight: '800',
   },
-  infoBoxText: {
-    fontSize: 11,
-    textAlign: 'center',
-    color: '#60646C',
+  formContainer: {
+    gap: Spacing.three,
+    marginTop: 4,
   },
-  guideCard: {
-    padding: Spacing.four,
-    borderRadius: 16,
-    gap: Spacing.two,
-  },
-  guideTitle: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  guideRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  guideBullet: {
-    fontSize: 13,
-    color: '#3c87f7',
-  },
-  guideText: {
-    flex: 1,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: '#00000080',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
-  },
-  accountChooserCard: {
-    width: '100%',
-    maxWidth: 440,
-    borderRadius: 24,
-    padding: Spacing.four,
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  chooserHeader: {
-    paddingBottom: Spacing.two,
-  },
-  chooserTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  chooserMainTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  chooserSubtitle: {
-    fontSize: 12,
-  },
-  chooserCloseBtn: {
-    padding: 6,
-  },
-  accountDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#8E918F33',
-    marginVertical: Spacing.two,
-  },
-  accountListScroll: {
-    maxHeight: 340,
-  },
-  accountItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  accountItemPressed: {
-    backgroundColor: '#8E918F18',
-  },
-  accountAvatarWrapper: {
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  accountAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  accountDetails: {
-    flex: 1,
-    marginLeft: 12,
-    gap: 2,
-  },
-  accountName: {
-    fontSize: 14,
-  },
-  accountEmail: {
-    fontSize: 12,
-  },
-  roleBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#3c87f715',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    color: '#3c87f7',
-    fontWeight: '700',
-  },
-  useAnotherAccountItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-  },
-  addAccountIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1,
-    borderColor: '#3c87f7',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#3c87f715',
-  },
-  customAccountForm: {
-    marginTop: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: '#8E918F10',
+  inputGroup: {
     gap: 6,
   },
-  customInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+  label: {
     fontSize: 13,
+    color: '#334155',
+    fontWeight: '700',
   },
-  customLoginBtn: {
-    marginTop: 10,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#3c87f7',
+  textInput: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+  },
+  passwordInput: {
+    flex: 1,
+    height: '100%',
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  eyeBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  eyeBtnText: {
+    fontSize: 11,
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+  primaryButton: {
+    height: 48,
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 6,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  chooserFooter: {
-    paddingTop: 4,
+  buttonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.99 }],
   },
-  footerNote: {
-    fontSize: 10,
-    lineHeight: 14,
-    textAlign: 'center',
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#94A3B8',
+    fontSize: 12,
+    textTransform: 'uppercase',
+  },
+  googleButtonWrapper: {
+    width: '100%',
   },
 });

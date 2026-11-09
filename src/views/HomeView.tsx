@@ -27,7 +27,7 @@ import {
 export function HomeView() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = false; // Selalu gunakan Light Mode sesuai permintaan
 
   const [mahasiswaList, setMahasiswaList] = useState<MahasiswaData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);

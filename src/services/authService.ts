@@ -17,45 +17,6 @@ export interface AuthUser {
   loginTimestamp: string;
 }
 
-export interface GoogleAccountOption {
-  id: string;
-  name: string;
-  email: string;
-  photoUrl: string;
-  role: string;
-}
-
-export const PRESET_GOOGLE_ACCOUNTS: GoogleAccountOption[] = [
-  {
-    id: 'google-henri-22',
-    name: 'Henri Tantyoko',
-    email: 'henritantyoko22@gmail.com',
-    photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-    role: 'Admin Utama Skripsi',
-  },
-  {
-    id: 'google-aris-undip',
-    name: 'Dr. Aris Sugiharto, S.Si., M.Kom.',
-    email: 'aris.sugiharto@live.undip.ac.id',
-    photoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
-    role: 'Koordinator Skripsi Informatika',
-  },
-  {
-    id: 'google-kusworo-undip',
-    name: 'Prof. Dr. Kusworo Adi, S.Si., M.T.',
-    email: 'kusworoadi@undip.ac.id',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    role: 'Ketua Departemen Informatika',
-  },
-  {
-    id: 'google-retno-undip',
-    name: 'Dr. Retno Kusumaningrum, S.Si., M.Kom.',
-    email: 'retno.kusuma@undip.ac.id',
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    role: 'Panitia Sidang & Skripsi',
-  },
-];
-
 let isConfigured = false;
 
 /**
@@ -196,18 +157,127 @@ function extractQueryParam(url: string, param: string): string | null {
 }
 
 /**
- * Otentikasi LANGSUNG ke Google OAuth 2.0 (Authorization Code Flow dengan PKCE)
- * Memperbaiki Error 400: unsupported_response_type
+ * 1. Otentikasi Email & Password (Login) via Firebase Auth REST API
+ */
+export async function signInWithEmailPassword(emailInput: string, passwordInput: string): Promise<AuthUser> {
+  const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: passwordInput,
+      returnSecureToken: true,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const code = data?.error?.message || '';
+    if (code.includes('EMAIL_NOT_FOUND')) {
+      throw new Error('Email atau username belum terdaftar. Silakan pilih tab Daftar.');
+    }
+    if (code.includes('INVALID_PASSWORD') || code.includes('INVALID_LOGIN_CREDENTIALS')) {
+      throw new Error('Kata sandi salah. Silakan periksa kembali.');
+    }
+    if (code.includes('USER_DISABLED')) {
+      throw new Error('Akun ini dinonaktifkan oleh administrator.');
+    }
+    if (code.includes('TOO_MANY_ATTEMPTS_TRY_LATER')) {
+      throw new Error('Terlalu banyak percobaan gagal. Silakan tunggu beberapa saat.');
+    }
+    throw new Error(data?.error?.message || 'Gagal masuk. Periksa kembali email dan password.');
+  }
+
+  return {
+    id: data.localId,
+    name: data.displayName || email.split('@')[0],
+    email: data.email,
+    photoUrl: null,
+    idToken: data.idToken,
+    provider: 'password',
+    projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
+    bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
+    clientId: GOOGLE_SERVICE_CONFIG.CLIENT_ID,
+    loginTimestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+/**
+ * 2. Registrasi Akun Baru (Register) via Firebase Auth REST API
+ */
+export async function signUpWithEmailPassword(
+  nameInput: string,
+  emailInput: string,
+  passwordInput: string
+): Promise<AuthUser> {
+  const email = emailInput.includes('@') ? emailInput.trim() : `${emailInput.trim()}@undip.ac.id`;
+  const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password: passwordInput,
+      returnSecureToken: true,
+    }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const code = data?.error?.message || '';
+    if (code.includes('EMAIL_EXISTS')) {
+      throw new Error('Email ini sudah terdaftar. Silakan pilih tab Masuk.');
+    }
+    if (code.includes('WEAK_PASSWORD')) {
+      throw new Error('Kata sandi terlalu pendek. Minimal 6 karakter.');
+    }
+    throw new Error(data?.error?.message || 'Gagal mendaftar akun baru.');
+  }
+
+  // Simpan nama lengkap ke profil pengguna
+  try {
+    const updateUrl = `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+    await fetch(updateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idToken: data.idToken,
+        displayName: nameInput.trim(),
+        returnSecureToken: true,
+      }),
+    });
+  } catch (err) {
+    console.warn('[FirebaseAuth] Gagal update displayName saat register:', err);
+  }
+
+  return {
+    id: data.localId,
+    name: nameInput.trim() || email.split('@')[0],
+    email: data.email,
+    photoUrl: null,
+    idToken: data.idToken,
+    provider: 'password',
+    projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
+    bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
+    clientId: GOOGLE_SERVICE_CONFIG.CLIENT_ID,
+    loginTimestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+/**
+ * 3. Otentikasi LANGSUNG ke Google OAuth 2.0 (Authorization Code Flow dengan PKCE)
  */
 export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
-  // 1. Buat PKCE Code Verifier dan Code Challenge
   const codeVerifier = generateRandomVerifier(64);
   const codeChallenge = computeSha256Base64Url(codeVerifier);
-
-  // 2. Redirect URI sesuai skema iOS terdaftar
   const redirectUri = `${GOOGLE_SERVICE_CONFIG.REVERSED_CLIENT_ID}:/oauth2redirect`;
 
-  // 3. Authorization URL resmi Google (response_type=code untuk klien iOS)
   const authUrl =
     `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(GOOGLE_SERVICE_CONFIG.CLIENT_ID)}` +
@@ -218,8 +288,6 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
     `&code_challenge_method=S256` +
     `&prompt=select_account`;
 
-  console.log('[GoogleOAuth] Membuka Google OAuth dengan PKCE response_type=code...');
-
   const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
   if (result.type === 'success' && result.url) {
@@ -229,7 +297,6 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
       throw new Error(`Google Auth ditolak: ${err || 'Kode otorisasi tidak ditemukan.'}`);
     }
 
-    // 4. Tukarkan authorization code + code_verifier dengan Token di Google Token Endpoint
     const tokenParams = new URLSearchParams({
       client_id: GOOGLE_SERVICE_CONFIG.CLIENT_ID,
       code: authCode,
@@ -247,8 +314,6 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
     });
 
     if (!tokenRes.ok) {
-      const errBody = await tokenRes.text();
-      console.warn('[GoogleOAuth] Gagal menukarkan code dengan token:', errBody);
       throw new Error('Gagal menukarkan kode otentikasi Google dengan token.');
     }
 
@@ -256,14 +321,14 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
     const accessToken = tokenData.access_token;
     const idToken = tokenData.id_token;
 
-    // 5. Ambil data profil dari Google UserInfo API
+    // Ambil data profil dari Google UserInfo API
     const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const googleUser = userInfoRes.ok ? await userInfoRes.json() : {};
 
-    // 6. Verifikasi dan daftarkan ke Firebase Authentication REST API
+    // Daftarkan sesi ke Firebase Authentication REST API
     let firebaseUid = googleUser.id || 'firebase-usr-' + Date.now();
     try {
       const firebaseAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
@@ -285,7 +350,6 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
       if (fbRes.ok) {
         const fbData = await fbRes.json();
         firebaseUid = fbData.localId || firebaseUid;
-        console.log('[FirebaseAuth] Sukses login Firebase Auth UID:', firebaseUid);
       }
     } catch (err) {
       console.warn('[FirebaseAuth] Gagal integrasi REST Firebase Auth:', err);
@@ -310,26 +374,6 @@ export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
   }
 
   throw new Error('Otentikasi Google tidak mengembalikan hasil.');
-}
-
-/**
- * Login langsung dengan akun yang dipilih dari dialog
- */
-export async function signInWithSelectedAccount(account: GoogleAccountOption): Promise<AuthUser> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  return {
-    id: account.id,
-    name: account.name,
-    email: account.email,
-    photoUrl: account.photoUrl,
-    idToken: 'token-' + account.id,
-    provider: 'google.com',
-    projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
-    bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
-    clientId: GOOGLE_SERVICE_CONFIG.CLIENT_ID,
-    loginTimestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-  };
 }
 
 /**
@@ -367,12 +411,11 @@ export async function signInWithGoogle(): Promise<AuthUser> {
     }
   }
 
-  // Jika di Expo Go / Web, jalankan Authorization Code Flow dengan PKCE
   return await signInWithRealGoogleOAuth();
 }
 
 /**
- * Sign Out dari sesi Google
+ * Sign Out dari sesi
  */
 export async function signOutGoogle(): Promise<void> {
   try {
