@@ -11,7 +11,16 @@
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.undip.SkripsiProjectApp",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
