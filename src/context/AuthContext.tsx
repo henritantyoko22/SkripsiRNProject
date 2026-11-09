@@ -9,12 +9,14 @@ import {
 import {
   saveUserSession,
   getUserSession,
+  getUserSessionAsync,
   clearUserSession,
 } from '@/services/storageService';
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
+  isInitialLoading: boolean;
   error: string | null;
   signIn: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -26,19 +28,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // MMKV synchronous read: langsung bypass login di frame render pertama tanpa jeda/flicker
+  // MMKV synchronous read: jika MMKV/memory sudah ada, langsung dapat user seketika
   const [user, setUser] = useState<AuthUser | null>(() => {
     return getUserSession();
   });
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(() => !user);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Verifikasi dan sinkronisasi sesi dari MMKV saat aplikasi dimuat
+  // Verifikasi sesi dari MMKV / AsyncStorage saat aplikasi pertama kali dibuka (Cold Start)
   useEffect(() => {
-    const savedSession = getUserSession();
-    if (savedSession && (!user || user.id !== savedSession.id)) {
-      setUser(savedSession);
+    async function restoreSession() {
+      try {
+        const savedSession = await getUserSessionAsync();
+        if (savedSession) {
+          setUser(savedSession);
+        }
+      } catch (err) {
+        console.warn('Gagal memulihkan sesi dari storage:', err);
+      } finally {
+        setIsInitialLoading(false);
+      }
     }
+    restoreSession();
   }, []);
 
   const clearError = useCallback(() => {
@@ -50,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signInWithGoogle();
-      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      // Simpan token & sesi ke storage agar bypass login saat keluar aplikasi
       saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
@@ -66,7 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signInWithEmailPassword(email, password);
-      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      // Simpan token & sesi ke storage agar bypass login saat keluar aplikasi
       saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
@@ -82,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signUpWithEmailPassword(name, email, password);
-      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      // Simpan token & sesi ke storage agar bypass login saat keluar aplikasi
       saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
@@ -100,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err: any) {
       console.warn('Error saat sign out:', err);
     } finally {
-      // Hapus token dan sesi dari MMKV
+      // Hapus token dan sesi dari storage
       clearUserSession();
       setUser(null);
       setIsLoading(false);
@@ -112,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         user,
         isLoading,
+        isInitialLoading,
         error,
         signIn,
         signInWithEmail,
