@@ -1,4 +1,5 @@
 import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
+import { getAuthToken } from '@/services/storageService';
 
 export interface MahasiswaData {
   nim: string;
@@ -73,6 +74,17 @@ function fromFirestoreDocument(doc: any): MahasiswaData | null {
   };
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export function getStudentDocId(email: string): string {
   return email.toLowerCase().replace(/[^a-zA-Z0-9_-]/g, '_');
 }
@@ -84,7 +96,7 @@ export async function fetchAllMahasiswa(): Promise<MahasiswaData[]> {
   const url = `${FIRESTORE_BASE_URL}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: getAuthHeaders() });
     if (response.ok) {
       const data = await response.json();
       if (data?.documents && Array.isArray(data.documents)) {
@@ -113,7 +125,7 @@ export async function fetchMahasiswaData(
   const url = `${FIRESTORE_BASE_URL}/${docId}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { headers: getAuthHeaders() });
     if (response.ok) {
       const data = await response.json();
       const student = fromFirestoreDocument(data);
@@ -161,9 +173,7 @@ export async function saveMahasiswaData(data: MahasiswaData): Promise<boolean> {
     const payload = toFirestoreFields(data);
     const response = await fetch(url, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: getAuthHeaders(),
       body: JSON.stringify(payload),
     });
 
@@ -182,7 +192,10 @@ export async function deleteMahasiswaData(email: string): Promise<boolean> {
   const url = `${FIRESTORE_BASE_URL}/${docId}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
 
   try {
-    const response = await fetch(url, { method: 'DELETE' });
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
     return response.ok;
   } catch (error) {
     console.warn('[Firestore] Error delete mahasiswa:', error);

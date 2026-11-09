@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import {
   AuthUser,
   signInWithGoogle,
@@ -6,6 +6,11 @@ import {
   signUpWithEmailPassword,
   signOutGoogle,
 } from '@/services/authService';
+import {
+  saveUserSession,
+  getUserSession,
+  clearUserSession,
+} from '@/services/storageService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -21,9 +26,20 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  // MMKV synchronous read: langsung bypass login di frame render pertama tanpa jeda/flicker
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    return getUserSession();
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Verifikasi dan sinkronisasi sesi dari MMKV saat aplikasi dimuat
+  useEffect(() => {
+    const savedSession = getUserSession();
+    if (savedSession && (!user || user.id !== savedSession.id)) {
+      setUser(savedSession);
+    }
+  }, []);
 
   const clearError = useCallback(() => {
     setError(null);
@@ -34,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signInWithGoogle();
+      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
       const errorMessage = err?.message || 'Gagal masuk dengan Google. Silakan coba lagi.';
@@ -48,6 +66,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signInWithEmailPassword(email, password);
+      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
       setError(err?.message || 'Gagal masuk. Periksa kembali email dan password Anda.');
@@ -62,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       setError(null);
       const authenticatedUser = await signUpWithEmailPassword(name, email, password);
+      // Simpan token & sesi ke MMKV agar bypass login saat keluar aplikasi
+      saveUserSession(authenticatedUser);
       setUser(authenticatedUser);
     } catch (err: any) {
       setError(err?.message || 'Gagal mendaftarkan akun baru.');
@@ -75,11 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       await signOutGoogle();
-      setUser(null);
     } catch (err: any) {
       console.warn('Error saat sign out:', err);
-      setUser(null);
     } finally {
+      // Hapus token dan sesi dari MMKV
+      clearUserSession();
+      setUser(null);
       setIsLoading(false);
     }
   }, []);
