@@ -21,7 +21,6 @@ import {
   fetchAllMahasiswa,
   saveMahasiswaData,
   deleteMahasiswaData,
-  syncInitialDataToFirestore,
 } from '@/services/studentService';
 
 export function HomeView() {
@@ -183,24 +182,7 @@ export function HomeView() {
     );
   };
 
-  const handleForceSync = async () => {
-    Alert.alert(
-      'Sinkronkan 12 Mahasiswa',
-      'Muat dan simpan minimal 12 data mahasiswa skripsi ke database Cloud Firestore sekarang?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Sinkronkan',
-          onPress: async () => {
-            setLoading(true);
-            await syncInitialDataToFirestore();
-            await loadData();
-            Alert.alert('Selesai', 'Seluruh 12 data mahasiswa berhasil disinkronkan ke Firestore.');
-          },
-        },
-      ]
-    );
-  };
+
 
   const handleSignOut = () => {
     Alert.alert(
@@ -320,7 +302,7 @@ export function HomeView() {
             </ThemedText>
           </View>
 
-          {/* Action Row: Tombol Tambah Mahasiswa & Tombol Sync */}
+          {/* Action Row: Tombol Tambah Mahasiswa */}
           <View style={styles.actionButtonsContainer}>
             <Pressable
               onPress={handleOpenAdd}
@@ -332,14 +314,6 @@ export function HomeView() {
                 + Tambah Mahasiswa Baru
               </ThemedText>
             </Pressable>
-
-            {mahasiswaList.length < 10 && (
-              <Pressable onPress={handleForceSync} style={styles.syncButton}>
-                <ThemedText type="code" style={styles.syncButtonText}>
-                  ⚡ Sinkronkan 12 Data Firestore
-                </ThemedText>
-              </Pressable>
-            )}
           </View>
         </View>
 
