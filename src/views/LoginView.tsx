@@ -23,13 +23,21 @@ import {
 } from '@/services/authService';
 
 export function LoginView() {
-  const { signInWithAccount, isLoading, error, clearError } = useAuth();
+  const { signIn, signInWithAccount, isLoading, error, clearError } = useAuth();
   const theme = useTheme();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
   const [isChooserOpen, setIsChooserOpen] = useState<boolean>(false);
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+
+  const handleRealGoogleLogin = async () => {
+    try {
+      await signIn();
+    } catch (e) {
+      // Error is stored in AuthContext
+    }
+  };
 
   // Form akun lain / custom
   const [isCustomOpen, setIsCustomOpen] = useState<boolean>(false);
@@ -107,15 +115,23 @@ export function LoginView() {
 
           <View style={styles.buttonWrapper}>
             <GoogleSignInButton
-              title="Masuk dengan Google"
-              onPress={() => setIsChooserOpen(true)}
+              title="Masuk dengan Google (Akun Asli)"
+              onPress={handleRealGoogleLogin}
               isLoading={isLoading}
             />
+
+            <Pressable
+              onPress={() => setIsChooserOpen(true)}
+              style={styles.chooseAccountAltBtn}>
+              <ThemedText type="code" style={styles.chooseAccountAltText}>
+                Atau pilih akun preset / uji coba cepat ›
+              </ThemedText>
+            </Pressable>
           </View>
 
           <View style={styles.infoBox}>
             <ThemedText type="code" style={styles.infoBoxText}>
-              🔒 Klik tombol di atas untuk memilih akun Google Anda
+              🌐 Terhubung langsung ke Google OAuth 2.0 &amp; Firebase Authentication
             </ThemedText>
           </View>
         </ThemedView>
@@ -396,6 +412,16 @@ const styles = StyleSheet.create({
   buttonWrapper: {
     width: '100%',
     maxWidth: 320,
+    gap: 8,
+  },
+  chooseAccountAltBtn: {
+    paddingVertical: 6,
+    alignItems: 'center',
+  },
+  chooseAccountAltText: {
+    fontSize: 11,
+    color: '#3c87f7',
+    fontWeight: '600',
   },
   infoBox: {
     marginTop: Spacing.two,

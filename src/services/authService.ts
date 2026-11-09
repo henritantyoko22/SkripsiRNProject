@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { GOOGLE_SERVICE_CONFIG } from '@/config/googleService.config';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export interface AuthUser {
   id: string;
@@ -57,7 +60,7 @@ export const PRESET_GOOGLE_ACCOUNTS: GoogleAccountOption[] = [
 let isConfigured = false;
 
 /**
- * Inisialisasi Google Sign In dengan key dari GoogleService-Info.plist
+ * Inisialisasi Google Sign In native jika tersedia
  */
 export async function initializeGoogleSignIn(): Promise<boolean> {
   if (isConfigured) return true;
@@ -73,16 +76,99 @@ export async function initializeGoogleSignIn(): Promise<boolean> {
       return true;
     }
   } catch {
-    // Mode simulasi/Expo Go
+    // Mode Expo Go / Web
   }
   return false;
 }
 
+function extractQueryParam(url: string, param: string): string | null {
+  const match = url.match(new RegExp('[#?&]' + param + '=([^&#]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 /**
- * Login langsung dengan akun Google yang dipilih dari Account Chooser
+ * Otentikasi LANGSUNG ke Google OAuth 2.0 (accounts.google.com) dan Firebase Authentication
+ * Membuka browser sheet resmi Google untuk memilih akun / login akun Google asli
+ */
+export async function signInWithRealGoogleOAuth(): Promise<AuthUser> {
+  const redirectUri = `${GOOGLE_SERVICE_CONFIG.REVERSED_CLIENT_ID}:/oauth2redirect`;
+  const authUrl =
+    `https://accounts.google.com/o/oauth2/v2/auth?` +
+    `client_id=${encodeURIComponent(GOOGLE_SERVICE_CONFIG.CLIENT_ID)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=token` +
+    `&scope=${encodeURIComponent('openid profile email')}` +
+    `&prompt=select_account`;
+
+  console.log('[GoogleOAuth] Membuka jendela resmi Google Sign-In:', authUrl);
+
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
+
+  if (result.type === 'success' && result.url) {
+    const accessToken = extractQueryParam(result.url, 'access_token');
+    if (accessToken) {
+      // 1. Ambil profil pengguna asli dari API Google
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!userInfoRes.ok) {
+        throw new Error('Gagal mengambil data profil dari Google API.');
+      }
+
+      const googleUser = await userInfoRes.json();
+
+      // 2. Verifikasi dan daftarkan sesi ke Firebase Authentication REST API
+      let firebaseUid = googleUser.id;
+      try {
+        const firebaseAuthUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+        const fbRes = await fetch(firebaseAuthUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            postBody: `access_token=${accessToken}&providerId=google.com`,
+            requestUri: 'http://localhost',
+            returnIdpCredential: true,
+            returnSecureToken: true,
+          }),
+        });
+
+        if (fbRes.ok) {
+          const fbData = await fbRes.json();
+          firebaseUid = fbData.localId || googleUser.id;
+          console.log('[FirebaseAuth] Berhasil login ke Firebase Auth UID:', firebaseUid);
+        }
+      } catch (err) {
+        console.warn('[FirebaseAuth] Gagal integrasi REST Firebase Auth:', err);
+      }
+
+      return {
+        id: firebaseUid,
+        name: googleUser.name || 'Pengguna Google',
+        email: googleUser.email,
+        photoUrl: googleUser.picture || null,
+        idToken: accessToken,
+        provider: 'google.com',
+        projectId: GOOGLE_SERVICE_CONFIG.PROJECT_ID,
+        bundleId: GOOGLE_SERVICE_CONFIG.BUNDLE_ID,
+        clientId: GOOGLE_SERVICE_CONFIG.CLIENT_ID,
+        loginTimestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      };
+    }
+  }
+
+  if (result.type === 'cancel' || result.type === 'dismiss') {
+    throw new Error('Login Google dibatalkan oleh pengguna.');
+  }
+
+  throw new Error('Otentikasi Google tidak mengembalikan token.');
+}
+
+/**
+ * Login langsung dengan akun yang dipilih dari dialog
  */
 export async function signInWithSelectedAccount(account: GoogleAccountOption): Promise<AuthUser> {
-  await new Promise((resolve) => setTimeout(resolve, 400));
+  await new Promise((resolve) => setTimeout(resolve, 300));
 
   return {
     id: account.id,
@@ -99,16 +185,15 @@ export async function signInWithSelectedAccount(account: GoogleAccountOption): P
 }
 
 /**
- * Menjalankan alur Sign In dengan Google (Native module atau prompt fallback)
+ * Menjalankan alur Sign In dengan Google
  */
 export async function signInWithGoogle(): Promise<AuthUser> {
+  // Cek native module terlebih dahulu jika ada
   const hasNative = await initializeGoogleSignIn();
-
   if (hasNative) {
     try {
       const { GoogleSignin } = require('@react-native-google-signin/google-signin');
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      // Selalu signOut dulu di native agar prompt pemilihan akun Google selalu muncul
       try {
         await GoogleSignin.signOut();
       } catch {}
@@ -135,8 +220,8 @@ export async function signInWithGoogle(): Promise<AuthUser> {
     }
   }
 
-  // Jika di simulator / Expo Go tanpa native dev client, default ke akun utama
-  return signInWithSelectedAccount(PRESET_GOOGLE_ACCOUNTS[0]);
+  // Jika native module belum dikompilasi di Expo Go, jalankan Google OAuth via WebBrowser
+  return await signInWithRealGoogleOAuth();
 }
 
 /**
