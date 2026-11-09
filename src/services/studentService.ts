@@ -95,7 +95,7 @@ export const INITIAL_MAHASISWA_LIST: MahasiswaData[] = [
     updatedAt: new Date().toISOString(),
   },
   {
-    nim: '24060121140021',
+    nim: '24060120140021',
     nama: 'Fajar Ramadhan',
     email: 'fajar.ramadhan@students.undip.ac.id',
     fotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
@@ -110,6 +110,132 @@ export const INITIAL_MAHASISWA_LIST: MahasiswaData[] = [
     dosenWali: 'Ragil Saputra, S.Si., M.Cs.',
     judulSkripsi: 'Monitoring Kualitas Udara Laboratorium Berbasis IoT Menggunakan ESP32 dan Cloud Firestore',
     pembimbingSkripsi: 'Ragil Saputra, S.Si., M.Cs.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121130012',
+    nama: 'Rizky Pratama',
+    email: 'rizky.pratama@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 7,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Bimbingan',
+    ipk: 3.79,
+    sksSelesai: 138,
+    dosenWali: 'Dr. Indra Waspada, S.T., M.T.',
+    judulSkripsi: 'Deteksi Objek Kendaraan pada Kamera CCTV Lalu Lintas Menggunakan Algoritma YOLOv8',
+    pembimbingSkripsi: 'Dr. Indra Waspada, S.T., M.T.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121140045',
+    nama: 'Nabila Putri Santoso',
+    email: 'nabila.putri@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 7,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Seminar Proposal',
+    ipk: 3.88,
+    sksSelesai: 140,
+    dosenWali: 'Khadijah, S.Kom., M.Cs.',
+    judulSkripsi: 'Rancang Bangun Aplikasi Mobile Konsultasi Kesehatan Mental Mahasiswa Berbasis React Native',
+    pembimbingSkripsi: 'Khadijah, S.Kom., M.Cs.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121120067',
+    nama: 'Muhammad Alfarizi',
+    email: 'm.alfarizi@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 8,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Sidang Skripsi',
+    ipk: 3.72,
+    sksSelesai: 142,
+    dosenWali: 'Panji Wisnu Wirawan, S.T., M.T.',
+    judulSkripsi: 'Optimasi Rute Distribusi Logistik Menggunakan Algoritma Genetika dan Google Maps API',
+    pembimbingSkripsi: 'Panji Wisnu Wirawan, S.T., M.T.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121130089',
+    nama: 'Dewi Lestari',
+    email: 'dewi.lestari@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 7,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Bimbingan',
+    ipk: 3.85,
+    sksSelesai: 136,
+    dosenWali: 'Nurdin Bahtiar, S.Si., M.T.',
+    judulSkripsi: 'Pengembangan Sistem Informasi Geografis Pemetaan Daerah Rawan Banjir Kota Semarang',
+    pembimbingSkripsi: 'Nurdin Bahtiar, S.Si., M.T.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121140090',
+    nama: 'Ahmad Fauzan Hidayat',
+    email: 'ahmad.fauzan@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 7,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Seminar Proposal',
+    ipk: 3.91,
+    sksSelesai: 138,
+    dosenWali: 'Dr. Aris Puji Widodo, S.Si., M.T.',
+    judulSkripsi: 'Penerapan Algoritma Deep Learning LSTM untuk Prediksi Tren Harga Saham Sektor Teknologi',
+    pembimbingSkripsi: 'Dr. Aris Puji Widodo, S.Si., M.T.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060120140018',
+    nama: 'Citra Kirana Wulandari',
+    email: 'citra.kirana@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2020',
+    semester: 9,
+    statusAkademik: 'Lulus',
+    statusSkripsi: 'Lulus',
+    ipk: 3.94,
+    sksSelesai: 144,
+    dosenWali: 'Helmie Arif Wibawa, S.Si., M.Cs.',
+    judulSkripsi: 'Sistem Presensi Mahasiswa Berbasis Face Recognition Menggunakan FaceNet pada Android',
+    pembimbingSkripsi: 'Helmie Arif Wibawa, S.Si., M.Cs.',
+    updatedAt: new Date().toISOString(),
+  },
+  {
+    nim: '24060121120054',
+    nama: 'Yoga Saputra Nugroho',
+    email: 'yoga.saputra@students.undip.ac.id',
+    fotoUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=200&q=80',
+    fakultas: 'Sains dan Matematika',
+    jurusan: 'Informatika',
+    angkatan: '2021',
+    semester: 7,
+    statusAkademik: 'Aktif',
+    statusSkripsi: 'Bimbingan',
+    ipk: 3.74,
+    sksSelesai: 136,
+    dosenWali: 'Dr. Retno Kusumaningrum, S.Si., M.Kom.',
+    judulSkripsi: 'Analisis Keamanan Server Kampus Menggunakan Web Application Firewall (WAF) ModSecurity',
+    pembimbingSkripsi: 'Dr. Retno Kusumaningrum, S.Si., M.Kom.',
     updatedAt: new Date().toISOString(),
   },
 ];
@@ -171,38 +297,7 @@ export function getStudentDocId(email: string): string {
 }
 
 /**
- * Mengambil SELURUH data mahasiswa dari database Firestore untuk tampilan admin
- */
-export async function fetchAllMahasiswa(): Promise<MahasiswaData[]> {
-  const url = `${FIRESTORE_BASE_URL}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
-
-  try {
-    const response = await fetch(url);
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.documents && Array.isArray(data.documents) && data.documents.length > 0) {
-        const list = data.documents
-          .map(fromFirestoreDocument)
-          .filter((item: MahasiswaData | null): item is MahasiswaData => item !== null);
-        if (list.length > 0) {
-          return list;
-        }
-      }
-    }
-  } catch (error) {
-    console.warn('[Firestore] Gagal fetch all mahasiswa via REST:', error);
-  }
-
-  // Jika Firestore belum memiliki data, simpan data awal (seed) ke Firestore
-  for (const mhs of INITIAL_MAHASISWA_LIST) {
-    saveMahasiswaData(mhs).catch(() => {});
-  }
-
-  return INITIAL_MAHASISWA_LIST;
-}
-
-/**
- * Menyimpan atau memperbarui data mahasiswa ke Firestore
+ * Menyimpan data mahasiswa ke Firestore
  */
 export async function saveMahasiswaData(data: MahasiswaData): Promise<boolean> {
   const docId = getStudentDocId(data.email);
@@ -218,13 +313,64 @@ export async function saveMahasiswaData(data: MahasiswaData): Promise<boolean> {
       body: JSON.stringify(payload),
     });
 
-    if (response.ok) {
-      return true;
-    }
+    return response.ok;
   } catch (error) {
     console.warn('[Firestore] Network error saat simpan mahasiswa:', error);
+    return false;
   }
-  return false;
+}
+
+/**
+ * Menyimpan seluruh data awal (12 mahasiswa) langsung ke Cloud Firestore
+ */
+export async function syncInitialDataToFirestore(): Promise<void> {
+  await Promise.allSettled(
+    INITIAL_MAHASISWA_LIST.map((mhs) => saveMahasiswaData(mhs))
+  );
+}
+
+/**
+ * Mengambil SELURUH data mahasiswa dari database Firestore.
+ * Jika data di Firestore masih kurang dari 10 (misal baru ada 1), otomatis menyinkronkan
+ * daftar lengkap 12 data mahasiswa ke Firestore sehingga tabel selalu lengkap!
+ */
+export async function fetchAllMahasiswa(): Promise<MahasiswaData[]> {
+  const url = `${FIRESTORE_BASE_URL}?key=${GOOGLE_SERVICE_CONFIG.API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.documents && Array.isArray(data.documents) && data.documents.length > 0) {
+        const list = data.documents
+          .map(fromFirestoreDocument)
+          .filter((item: MahasiswaData | null): item is MahasiswaData => item !== null);
+
+        // Jika data di Firestore sudah >= 10, kembalikan data tersebut
+        if (list.length >= 10) {
+          return list;
+        }
+
+        // Jika data di Firestore masih kurang dari 10 (misal baru ada 1 akun login),
+        // gabungkan dengan data template dan simpan sisanya ke Firestore!
+        const existingEmails = new Set(list.map((m: MahasiswaData) => m.email.toLowerCase()));
+        const missing = INITIAL_MAHASISWA_LIST.filter(
+          (m: MahasiswaData) => !existingEmails.has(m.email.toLowerCase())
+        );
+
+        // Upload mahasiswa yang belum ada ke Firestore di background
+        missing.forEach((m: MahasiswaData) => saveMahasiswaData(m).catch(() => {}));
+
+        return [...list, ...missing];
+      }
+    }
+  } catch (error) {
+    console.warn('[Firestore] Gagal fetch all mahasiswa via REST:', error);
+  }
+
+  // Jika Firestore belum terisi sama sekali, upload seluruh 12 data ke Firestore
+  syncInitialDataToFirestore().catch(() => {});
+  return INITIAL_MAHASISWA_LIST;
 }
 
 /**

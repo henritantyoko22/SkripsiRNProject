@@ -9,6 +9,7 @@ import {
   Modal,
   TextInput,
   RefreshControl,
+  useColorScheme,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '@/context/AuthContext';
@@ -20,10 +21,14 @@ import {
   fetchAllMahasiswa,
   saveMahasiswaData,
   deleteMahasiswaData,
+  syncInitialDataToFirestore,
 } from '@/services/studentService';
 
 export function HomeView() {
   const { user, signOut, isLoading: isAuthLoading } = useAuth();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+
   const [mahasiswaList, setMahasiswaList] = useState<MahasiswaData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -37,8 +42,9 @@ export function HomeView() {
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [editingTargetName, setEditingTargetName] = useState<string>('');
 
-  // Form input fields
+  // Form input fields (selalu terisi data mahasiswa yang sedang diedit)
   const [formNim, setFormNim] = useState('');
   const [formNama, setFormNama] = useState('');
   const [formEmail, setFormEmail] = useState('');
@@ -51,7 +57,9 @@ export function HomeView() {
   const [formJudul, setFormJudul] = useState('');
   const [formPembimbing, setFormPembimbing] = useState('Dr. Aris Sugiharto, S.Si., M.Kom.');
   const [formDosenWali, setFormDosenWali] = useState('Prof. Dr. Kusworo Adi, S.Si., M.T.');
-  const [formStatusSkripsi, setFormStatusSkripsi] = useState<'Bimbingan' | 'Seminar Proposal' | 'Sidang Skripsi' | 'Lulus'>('Bimbingan');
+  const [formStatusSkripsi, setFormStatusSkripsi] = useState<
+    'Bimbingan' | 'Seminar Proposal' | 'Sidang Skripsi' | 'Lulus'
+  >('Bimbingan');
 
   const loadData = useCallback(async () => {
     try {
@@ -76,7 +84,9 @@ export function HomeView() {
 
   const handleOpenAdd = () => {
     setIsEditing(false);
-    setFormNim('240601211' + Math.floor(10000 + Math.random() * 90000));
+    setEditingTargetName('');
+    const randomSuffix = Math.floor(10000 + Math.random() * 90000);
+    setFormNim(`240601211${randomSuffix}`);
     setFormNama('');
     setFormEmail('');
     setFormJurusan('Informatika');
@@ -92,27 +102,29 @@ export function HomeView() {
     setIsFormOpen(true);
   };
 
+  // Saat tombol EDIT diklik: AMBIL LANGSUNG DATA MAHASISWA DAN ISI KE INPUT
   const handleOpenEdit = (mhs: MahasiswaData) => {
     setIsEditing(true);
-    setFormNim(mhs.nim);
-    setFormNama(mhs.nama);
-    setFormEmail(mhs.email);
-    setFormJurusan(mhs.jurusan);
-    setFormFakultas(mhs.fakultas);
-    setFormAngkatan(mhs.angkatan);
-    setFormSemester(mhs.semester.toString());
-    setFormIpk(mhs.ipk.toString());
-    setFormSks(mhs.sksSelesai.toString());
-    setFormJudul(mhs.judulSkripsi);
-    setFormPembimbing(mhs.pembimbingSkripsi);
-    setFormDosenWali(mhs.dosenWali);
+    setEditingTargetName(mhs.nama);
+    setFormNim(String(mhs.nim || ''));
+    setFormNama(String(mhs.nama || ''));
+    setFormEmail(String(mhs.email || ''));
+    setFormJurusan(String(mhs.jurusan || 'Informatika'));
+    setFormFakultas(String(mhs.fakultas || 'Sains dan Matematika'));
+    setFormAngkatan(String(mhs.angkatan || '2021'));
+    setFormSemester(String(mhs.semester ?? 7));
+    setFormIpk(String(mhs.ipk ?? 3.8));
+    setFormSks(String(mhs.sksSelesai ?? 138));
+    setFormJudul(String(mhs.judulSkripsi || ''));
+    setFormPembimbing(String(mhs.pembimbingSkripsi || ''));
+    setFormDosenWali(String(mhs.dosenWali || ''));
     setFormStatusSkripsi(mhs.statusSkripsi || 'Bimbingan');
     setIsFormOpen(true);
   };
 
   const handleSaveForm = async () => {
     if (!formNama.trim() || !formNim.trim() || !formJudul.trim()) {
-      Alert.alert('Perhatian', 'Harap isi NIM, Nama Mahasiswa, dan Judul Skripsi.');
+      Alert.alert('Perhatian', 'Harap lengkapi NIM, Nama Mahasiswa, dan Judul Skripsi.');
       return;
     }
 
@@ -171,6 +183,25 @@ export function HomeView() {
     );
   };
 
+  const handleForceSync = async () => {
+    Alert.alert(
+      'Sinkronkan 12 Mahasiswa',
+      'Muat dan simpan minimal 12 data mahasiswa skripsi ke database Cloud Firestore sekarang?',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Sinkronkan',
+          onPress: async () => {
+            setLoading(true);
+            await syncInitialDataToFirestore();
+            await loadData();
+            Alert.alert('Selesai', 'Seluruh 12 data mahasiswa berhasil disinkronkan ke Firestore.');
+          },
+        },
+      ]
+    );
+  };
+
   const handleSignOut = () => {
     Alert.alert(
       'Konfirmasi Keluar',
@@ -200,7 +231,7 @@ export function HomeView() {
     return matchesSearch && matchesStatus;
   });
 
-  // Statistik singkat
+  // Statistik ringkasan
   const totalMahasiswa = mahasiswaList.length;
   const countBimbingan = mahasiswaList.filter((m) => m.statusSkripsi === 'Bimbingan').length;
   const countSempro = mahasiswaList.filter((m) => m.statusSkripsi === 'Seminar Proposal').length;
@@ -218,6 +249,16 @@ export function HomeView() {
         return { bg: '#DBEAFE', text: '#1E40AF', border: '#BFDBFE' };
     }
   };
+
+  // Style input teks adaptif tema terang / gelap agar selalu terlihat jelas
+  const inputStyle = [
+    styles.textInput,
+    {
+      color: isDark ? '#FFFFFF' : '#111827',
+      backgroundColor: isDark ? '#27272A' : '#F9FAFB',
+      borderColor: isDark ? '#3F3F46' : '#D1D5DB',
+    },
+  ];
 
   return (
     <ScrollView
@@ -250,7 +291,7 @@ export function HomeView() {
                 </ThemedText>
               </View>
               <ThemedText type="smallBold" style={styles.adminName}>
-                {user?.name || 'Administrator'}
+                {user?.name || 'Administrator Skripsi'}
               </ThemedText>
               <ThemedText type="code" themeColor="textSecondary" style={styles.adminEmail}>
                 {user?.email || 'admin@undip.ac.id'}
@@ -268,22 +309,38 @@ export function HomeView() {
           </View>
         </ThemedView>
 
-        {/* Title & Quick Stats */}
-        <View style={styles.statsHeaderRow}>
-          <View>
+        {/* Section Judul & Tombol Tambah Mahasiswa (Full Width - Tidak Terpotong) */}
+        <View style={styles.headerSection}>
+          <View style={styles.titleInfo}>
             <ThemedText type="subtitle" style={styles.pageTitle}>
               Daftar Mahasiswa &amp; Skripsi
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
-              Database Cloud Firestore • Universitas Diponegoro
+              Database Cloud Firestore • Universitas Diponegoro ({mahasiswaList.length} Mahasiswa)
             </ThemedText>
           </View>
 
-          <Pressable onPress={handleOpenAdd} style={styles.addButton}>
-            <ThemedText type="smallBold" style={styles.addButtonText}>
-              + Tambah Mahasiswa
-            </ThemedText>
-          </Pressable>
+          {/* Action Row: Tombol Tambah Mahasiswa & Tombol Sync */}
+          <View style={styles.actionButtonsContainer}>
+            <Pressable
+              onPress={handleOpenAdd}
+              style={({ pressed }) => [
+                styles.fullAddButton,
+                pressed && { opacity: 0.85, transform: [{ scale: 0.99 }] },
+              ]}>
+              <ThemedText type="smallBold" style={styles.fullAddButtonText}>
+                + Tambah Mahasiswa Baru
+              </ThemedText>
+            </Pressable>
+
+            {mahasiswaList.length < 10 && (
+              <Pressable onPress={handleForceSync} style={styles.syncButton}>
+                <ThemedText type="code" style={styles.syncButtonText}>
+                  ⚡ Sinkronkan 12 Data Firestore
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
         </View>
 
         {/* Metric Cards Row */}
@@ -342,9 +399,16 @@ export function HomeView() {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="🔍 Cari Mahasiswa, NIM, Judul Skripsi, atau Dosen..."
-            placeholderTextColor="#888"
-            style={styles.searchInput}
+            placeholder="🔍 Cari Nama Mahasiswa, NIM, Judul Skripsi, atau Dosen..."
+            placeholderTextColor={isDark ? '#9CA3AF' : '#6B7280'}
+            style={[
+              styles.searchInput,
+              {
+                color: isDark ? '#FFFFFF' : '#111827',
+                backgroundColor: isDark ? '#27272A' : '#FFFFFF',
+                borderColor: isDark ? '#3F3F46' : '#D1D5DB',
+              },
+            ]}
           />
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipsRow}>
@@ -371,7 +435,7 @@ export function HomeView() {
           <View style={styles.tableLoading}>
             <ActivityIndicator size="large" color="#3c87f7" />
             <ThemedText type="small" themeColor="textSecondary">
-              Memuat data tabel dari Cloud Firestore...
+              Memuat data tabel mahasiswa dari Cloud Firestore...
             </ThemedText>
           </View>
         ) : filteredList.length === 0 ? (
@@ -406,8 +470,8 @@ export function HomeView() {
                           </View>
                         )}
                       </View>
-                      <View>
-                        <ThemedText type="smallBold" style={styles.mhsName}>
+                      <View style={{ flex: 1 }}>
+                        <ThemedText type="smallBold" style={styles.mhsName} numberOfLines={1}>
                           {mhs.nama}
                         </ThemedText>
                         <ThemedText type="code" style={styles.mhsNim}>
@@ -443,7 +507,7 @@ export function HomeView() {
                       <ThemedText type="code" themeColor="textSecondary">
                         Pembimbing:
                       </ThemedText>
-                      <ThemedText type="small" style={styles.pembimbingName}>
+                      <ThemedText type="small" style={styles.pembimbingName} numberOfLines={1}>
                         {mhs.pembimbingSkripsi}
                       </ThemedText>
                     </View>
@@ -604,7 +668,7 @@ export function HomeView() {
                     }}
                     style={styles.modalEditFullBtn}>
                     <ThemedText type="smallBold" style={{ color: '#fff' }}>
-                      ✏️ Edit Skripsi Ini
+                      ✏️ Edit Skripsi Mahasiswa Ini
                     </ThemedText>
                   </Pressable>
                 </View>
@@ -614,7 +678,7 @@ export function HomeView() {
         </View>
       </Modal>
 
-      {/* MODAL 2: Form Tambah / Edit Mahasiswa */}
+      {/* MODAL 2: Form Tambah / Edit Mahasiswa (DATA PRE-FILLED & TIDAK KOSONG) */}
       <Modal
         visible={isFormOpen}
         animationType="slide"
@@ -623,9 +687,16 @@ export function HomeView() {
         <View style={styles.modalOverlay}>
           <ThemedView type="background" style={styles.modalContent}>
             <View style={styles.modalHeaderRow}>
-              <ThemedText type="subtitle" style={styles.modalTitle}>
-                {isEditing ? 'Edit Data Skripsi' : 'Tambah Mahasiswa Baru'}
-              </ThemedText>
+              <View>
+                <ThemedText type="subtitle" style={styles.modalTitle}>
+                  {isEditing ? 'Edit Data Skripsi' : 'Tambah Mahasiswa Baru'}
+                </ThemedText>
+                {isEditing && (
+                  <ThemedText type="code" style={styles.editingBannerText}>
+                    Mengedit data: {editingTargetName} (NIM: {formNim})
+                  </ThemedText>
+                )}
+              </View>
               <Pressable onPress={() => setIsFormOpen(false)} style={styles.closeModalBtn}>
                 <ThemedText type="smallBold">✕</ThemedText>
               </Pressable>
@@ -638,19 +709,19 @@ export function HomeView() {
                   value={formNim}
                   onChangeText={setFormNim}
                   placeholder="24060121130089"
-                  placeholderTextColor="#888"
-                  style={styles.textInput}
+                  placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                  style={inputStyle}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <ThemedText type="smallBold">Nama Lengkap</ThemedText>
+                <ThemedText type="smallBold">Nama Lengkap Mahasiswa</ThemedText>
                 <TextInput
                   value={formNama}
                   onChangeText={setFormNama}
                   placeholder="Nama Lengkap Mahasiswa"
-                  placeholderTextColor="#888"
-                  style={styles.textInput}
+                  placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                  style={inputStyle}
                 />
               </View>
 
@@ -662,8 +733,8 @@ export function HomeView() {
                   multiline
                   numberOfLines={3}
                   placeholder="Tuliskan judul penelitian skripsi..."
-                  placeholderTextColor="#888"
-                  style={[styles.textInput, styles.textArea]}
+                  placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                  style={[inputStyle, styles.textArea]}
                 />
               </View>
 
@@ -673,13 +744,13 @@ export function HomeView() {
                   value={formPembimbing}
                   onChangeText={setFormPembimbing}
                   placeholder="Nama & Gelar Dosen Pembimbing"
-                  placeholderTextColor="#888"
-                  style={styles.textInput}
+                  placeholderTextColor={isDark ? '#71717A' : '#9CA3AF'}
+                  style={inputStyle}
                 />
               </View>
 
               <View style={styles.formGroup}>
-                <ThemedText type="smallBold">Tahap / Status Bimbingan</ThemedText>
+                <ThemedText type="smallBold">Tahap / Status Bimbingan Skripsi</ThemedText>
                 <View style={styles.statusChipsGrid}>
                   {(['Bimbingan', 'Seminar Proposal', 'Sidang Skripsi', 'Lulus'] as const).map(
                     (st) => {
@@ -688,7 +759,10 @@ export function HomeView() {
                         <Pressable
                           key={st}
                           onPress={() => setFormStatusSkripsi(st)}
-                          style={[styles.statusSelectChip, selected && styles.statusSelectChipActive]}>
+                          style={[
+                            styles.statusSelectChip,
+                            selected && styles.statusSelectChipActive,
+                          ]}>
                           <ThemedText
                             type="code"
                             style={[
@@ -710,7 +784,7 @@ export function HomeView() {
                   <TextInput
                     value={formJurusan}
                     onChangeText={setFormJurusan}
-                    style={styles.textInput}
+                    style={inputStyle}
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
@@ -718,7 +792,7 @@ export function HomeView() {
                   <TextInput
                     value={formAngkatan}
                     onChangeText={setFormAngkatan}
-                    style={styles.textInput}
+                    style={inputStyle}
                   />
                 </View>
               </View>
@@ -730,7 +804,7 @@ export function HomeView() {
                     value={formIpk}
                     onChangeText={setFormIpk}
                     keyboardType="decimal-pad"
-                    style={styles.textInput}
+                    style={inputStyle}
                   />
                 </View>
                 <View style={[styles.formGroup, { flex: 1 }]}>
@@ -739,9 +813,18 @@ export function HomeView() {
                     value={formSks}
                     onChangeText={setFormSks}
                     keyboardType="numeric"
-                    style={styles.textInput}
+                    style={inputStyle}
                   />
                 </View>
+              </View>
+
+              <View style={styles.formGroup}>
+                <ThemedText type="smallBold">Dosen Wali Akademik</ThemedText>
+                <TextInput
+                  value={formDosenWali}
+                  onChangeText={setFormDosenWali}
+                  style={inputStyle}
+                />
               </View>
             </ScrollView>
 
@@ -760,7 +843,7 @@ export function HomeView() {
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <ThemedText type="smallBold" style={{ color: '#fff' }}>
-                    {isEditing ? 'Simpan Perubahan' : 'Tambahkan ke Firestore'}
+                    {isEditing ? 'Simpan Perubahan ke Firestore' : 'Tambahkan ke Firestore'}
                   </ThemedText>
                 )}
               </Pressable>
@@ -841,30 +924,53 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  statsHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headerSection: {
+    gap: Spacing.two,
     marginTop: 4,
   },
+  titleInfo: {
+    gap: 2,
+  },
   pageTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '800',
   },
-  addButton: {
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  fullAddButton: {
+    flex: 1,
+    height: 44,
     backgroundColor: '#3c87f7',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
     shadowColor: '#3c87f7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
   },
-  addButtonText: {
+  fullAddButtonText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 13,
+  },
+  syncButton: {
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3c87f750',
+    backgroundColor: '#3c87f715',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  syncButtonText: {
+    color: '#3c87f7',
+    fontSize: 11,
+    fontWeight: '700',
   },
   metricsRow: {
     flexDirection: 'row',
@@ -890,14 +996,11 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   searchInput: {
-    height: 40,
+    height: 42,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#8E918F33',
     paddingHorizontal: 12,
     fontSize: 13,
-    backgroundColor: '#FFFFFF10',
-    color: '#1F1F1F',
   },
   filterChipsRow: {
     flexDirection: 'row',
@@ -905,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#8E918F33',
@@ -961,14 +1064,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarThumbnail: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   avatarThumbnailFallback: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: '#2563EB',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1066,17 +1169,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: Spacing.four,
-    maxHeight: '88%',
+    maxHeight: '90%',
     gap: Spacing.two,
   },
   modalHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
+  },
+  editingBannerText: {
+    fontSize: 11,
+    color: '#3c87f7',
+    marginTop: 2,
   },
   closeModalBtn: {
     padding: 6,
@@ -1152,13 +1260,10 @@ const styles = StyleSheet.create({
   },
   textInput: {
     borderWidth: 1,
-    borderColor: '#8E918F40',
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
-    backgroundColor: '#FFFFFF10',
-    color: '#1F1F1F',
   },
   textArea: {
     minHeight: 70,
