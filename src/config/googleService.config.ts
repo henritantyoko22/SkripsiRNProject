@@ -1,6 +1,7 @@
 /**
  * Konfigurasi Integrasi Google Sign-In & Firebase
- * Diambil langsung dan disinkronkan dengan file: GoogleService-Info.plist
+ * Mengambil kredensial secara dinamis dari Environment Variables (EXPO_PUBLIC_*)
+ * File .env tidak di-commit ke Git agar kredensial tetap aman.
  */
 
 export interface GoogleServiceInfoConfig {
@@ -22,30 +23,38 @@ export interface GoogleServiceInfoConfig {
 
 export const GOOGLE_SERVICE_CONFIG: GoogleServiceInfoConfig = {
   // iOS OAuth Client ID dari Google Console / Firebase
-  CLIENT_ID: '713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok.apps.googleusercontent.com',
+  CLIENT_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_CLIENT_ID || '',
 
   // Skema URL balik untuk redirect kembali ke app di iOS
-  REVERSED_CLIENT_ID: 'com.googleusercontent.apps.713806429454-0gba7b84e5c7ggldl0skka1iatfrgbok',
+  REVERSED_CLIENT_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_REVERSED_CLIENT_ID || '',
 
   // Firebase Web API Key
-  API_KEY: 'AIzaSyBxTNIy5sFRAvcIpaGUji_DVIlOnz0qk3k',
+  API_KEY:
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
 
   // Google Cloud Messaging / Firebase Cloud Messaging Sender ID
-  GCM_SENDER_ID: '713806429454',
+  GCM_SENDER_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_GCM_SENDER_ID || '',
 
   PLIST_VERSION: '1',
 
   // Bundle Identifier iOS (harus sama persis dengan yang terdaftar di Google Console)
-  BUNDLE_ID: 'com.undip.SkripsiProjectApp',
+  BUNDLE_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_BUNDLE_ID || 'com.undip.SkripsiProjectApp',
 
   // Nama Project Firebase
-  PROJECT_ID: 'appbaru-8a5da',
+  PROJECT_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
 
   // Cloud Storage Bucket
-  STORAGE_BUCKET: 'appbaru-8a5da.firebasestorage.app',
+  STORAGE_BUCKET:
+    process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
 
   // ID Aplikasi Firebase untuk platform iOS
-  GOOGLE_APP_ID: '1:713806429454:ios:af64b2bc70138f50d26b5f',
+  GOOGLE_APP_ID:
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
 
   IS_SIGNIN_ENABLED: true,
   IS_GCM_ENABLED: true,
